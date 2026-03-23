@@ -1,0 +1,22 @@
+Title, Color, Formula, Category, Notes
+ARI1, #FF0000,(1/W550) - (1/W700), Leaf Pigments, The value of this index ranges from 0 to more than 0.2. The common range for green vegetation is 0.001 to 0.1. 
+ARI2, #FF0000,W800 * ((1/W550) - (1/W700)), Leaf Pigments, The value of this index ranges from 0 to more than 0.2. The common range for green vegetation is 0.001 to 0.1. 
+CRI1, #FFFF00,(1/W510) - (1/W550), Leaf Pigments, The value of this index ranges from 0 to more than 15. The common range for green vegetation is 1 to 12. 
+CRI2, #FFFF00,(1/W510) - (1/W700), Leaf Pigments, The value of this index ranges from 0 to more than 15. The common range for green vegetation is 1 to 11. 
+SIPI, #8B0000,(W800 - W445) / (W800 + W680), Leaf Pigments, The value of this index ranges from 0 to 2. The common range for green vegetation is 0.8 to 1.8.  Peñuelas et al. (1995)
+FRI, #FFFF00,(1/W410 - 1/W460) * W800, Leaf Pigments, None
+CNDVI, #008000,(W750 - W705) / (W750 + W705), Uncategorized, The value of this index ranges from -1 to 1. The common range for green vegetation is 0.2 to 0.8.
+Ctr1, #FF0000,W695 / W420, Uncategorized, Carter (1994)
+NDVI, #008000,(W800 - W680) / (W800 + W680), Uncategorized, The value of this index ranges from -1 to 1. The common range for green vegetation is 0.2 to 0.8.
+
+
+Layer, Calculation, Value
+Layer 1, ARI1, -0.009770351
+Layer 1, ARI2, -0.6176174
+Layer 1, CRI1, 0.09597552
+Layer 1, CRI2, 0.08620516
+Layer 1, SIPI, 0.8508945
+Layer 1, FRI, 0.240736
+Layer 1, CNDVI, 0.4780833
+Layer 1, Ctr1, 0.8108426
+Layer 1, NDVI, 0.8712656
