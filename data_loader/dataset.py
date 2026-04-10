@@ -43,13 +43,10 @@ class SpectralDataset(Dataset):
     def __init__(self, data_path: str):
         self.data_path = data_path
     
-        self.tracked_xlsx = [] # additional meta data
+        self.tracked_xlsx = [] 
         self.tracked_csvs = []
-        self.tracked_jsons = [] # irrelevant for computation
 
         self.high_end_csvs = []
-        self.high_end_pngs = [] # irrelevant for computation
-
         self.low_cost_csvs = []
         self.low_cost_imgs = []
 
@@ -59,9 +56,7 @@ class SpectralDataset(Dataset):
         # Loading data
         """
         TODO:
-            - Concatenate the the scan corder readings
-            - Remove overwriting of records from the loading pipeline of the high end in hash_file
-            - Eliminate unnessary saving of pngs for the high end already provide the same information
+            - Concatenate the the scan corder readings 
         """
         self._load_fn()
         self.scan_corder_data = self._load_scan_corder_data()
@@ -253,7 +248,6 @@ class SpectralDataset(Dataset):
                         for disease_cat in os.listdir(cat_dir):
                             disease_cat_dir = os.path.join(cat_dir, disease_cat)
                             if disease_cat.endswith(".json"):
-                                self.tracked_jsons.append(disease_cat_dir)
                                 continue
                             for point in os.listdir(disease_cat_dir):
                                 point_dir  = os.path.join(disease_cat_dir, point)
@@ -263,7 +257,6 @@ class SpectralDataset(Dataset):
                                         self.high_end_csvs.append(specimen_dir)
                                         continue
                                     elif specimen.endswith(".png"):
-                                        self.high_end_pngs.append(specimen_dir)
                                         continue
                                     for sub in os.listdir(specimen_dir):
                                         sub_dir = os.path.join(specimen_dir, sub)
@@ -272,7 +265,7 @@ class SpectralDataset(Dataset):
                                         elif "data" in sub and sub.endswith(".csv"):
                                             self.low_cost_csvs.append(sub_dir)
                                         elif sub.endswith(".png"):
-                                            self.high_end_pngs.append(sub_dir)
+                                            continue
                                         elif sub.endswith(".csv") and "data" not in sub:
                                             self.high_end_csvs.append(sub_dir)                         
 
