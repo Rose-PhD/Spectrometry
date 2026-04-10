@@ -3,3 +3,4 @@ spectral_data
 .claude
 .ipynb_checkpoints
 __pycache__
+*.egg-info
