@@ -44,7 +44,7 @@ class Dataset(ABC):
         """Returns length of dataset"""
         raise NotImplementedError('Child class must implement __len__ method')
     
-
+    @abstractmethod
     def __getitem__(self, index):
         """Returns a single item"""
         raise NotImplementedError("Child class must implement __getitem__ method")
