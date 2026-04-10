@@ -57,6 +57,12 @@ class SpectralDataset(Dataset):
         self.high_end_calculation_files = []
         
         # Loading data
+        """
+        TODO:
+            - Concatenate the the scan corder readings
+            - Remove overwriting of records from the loading pipeline of the high end in hash_file
+            - Eliminate unnessary saving of pngs for the high end already provide the same information
+        """
         self._load_fn()
         self.scan_corder_data = self._load_scan_corder_data()
         self.extract_high_end_raw_calculations()
@@ -115,32 +121,42 @@ class SpectralDataset(Dataset):
         specimen_df = pd.read_csv(spectral_url)
         specimen_df = self.clean_low_cost_cols(specimen_df, index)
         return specimen_df[0], specimen_df[-1], img_url
+
+    @staticmethod
+    def get_label(reading):
+        PERIOD_INDEX, NAME_INDEX = 3, -1
+        reading = reading.split('/')
+        _period, dynamic_name = reading[PERIOD_INDEX], reading[NAME_INDEX]
+        dynamic_label = dynamic_name
+        _period = _period.split('_')[-1][-1]
+        if 'calculation' in dynamic_name:
+            dynamic_name = dynamic_name.split('_')[0]
+        else:
+            dynamic_name = dynamic_name.split('.')[0]
+        return dynamic_name + _period, dynamic_label
+
     
     def extract_high_end_raw_calculations(self):
         file_hash = dict()
         for reading in self.high_end_csvs:
-            dynamic_label = reading.split('/')[-1]
-            if 'calculations' in dynamic_label:
-                label = dynamic_label.split('_')[0]
-            else:
-                label = dynamic_label.split('.')[0]
-            
+            label, dynamic_label = SpectralDataset.get_label(reading)
             if label not in file_hash:
-                file_hash[label] = {'raw': None, 'calculations': None}
-
-            if 'calculations' in dynamic_label:
-                file_hash[label]['calculations'] = reading
-
+                file_hash[label] = {'raw': None, 'calculation': None}
+            
+            if 'calculation' in dynamic_label:
+                file_hash[label]['calculation'] = reading
             elif dynamic_label.endswith('.csv'):
                 file_hash[label]['raw'] = reading
-        
+            
+            else:
+                raise ValueError('Unsupported file format')
         _keys = list(file_hash.keys())
         for key in _keys:
             self.high_end_raw_files.append(file_hash[key]['raw'])
-            self.high_end_calculation_files.append(file_hash[key]['calculations'])
-
-        self.high_end_csvs, indices = SpectralDataset.remove_none(self.high_end_calculation_files)
-        self.high_end_calculation_files, _ = SpectralDataset.remove_none(self.high_end_raw_files, indices)
+            self.high_end_calculation_files.append(file_hash[key]['calculation'])
+        
+        self.high_end_calculation_files, indices = SpectralDataset.remove_none(self.high_end_calculation_files)
+        self.high_end_raw_files, _ = SpectralDataset.remove_none(self.high_end_raw_files, indices)
 
     
     @staticmethod
