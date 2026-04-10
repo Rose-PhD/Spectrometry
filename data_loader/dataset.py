@@ -116,6 +116,13 @@ class SpectralDataset(Dataset):
         _len = self.len_scan_corder_data()
         assert 0 <= index <= _len, f'Index out of range max({_len})'
         _values = self.scan_corder_data.iloc[index][LOW_TARGET_INDEX_BOUND: ].values
+        if not self.DONE_COMPUTING_WAVELENGTH:
+            cols = self.scan_corder_data.columns
+            _wavelength = list(cols[LOW_TARGET_INDEX_BOUND: ].values)
+            _wavelength.remove('week')
+            self.wavelength = np.array(_wavelength, dtype=np.float32)
+            self.DONE_COMPUTING_WAVELENGTH = True
+
         return np.array(_values).astype(np.float32)
 
 
@@ -138,6 +145,8 @@ class SpectralDataset(Dataset):
         # avg_spectral = (extracted_vals[0] + extracted_vals[1]) / 2
         if not self.DONE_COMPUTING_WAVELENGTH and _includes_wavelength:
             self.wavelength = extracted_vals[-1].astype(np.float32)
+            self.DONE_COMPUTING_WAVELENGTH = True
+
         return np.vstack([extracted_vals[0], extracted_vals[1]]).astype(np.float32)
 
     def get_low_cost_item(self, index):
@@ -273,6 +282,7 @@ class SpectralDataset(Dataset):
         raw_readings = SpectralDataset.convert_high_end_cols(raw_readings)
         if not self.DONE_COMPUTING_WAVELENGTH:
             self.wavelength = np.array(raw_readings['wavelength'].values).astype(np.float32)
+            self.DONE_COMPUTING_WAVELENGTH = True
         
         return raw_readings[raw_readings.columns[-1]].values.astype(np.float32)
    
