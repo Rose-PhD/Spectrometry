@@ -61,6 +61,7 @@ class SpectralDataset(Dataset):
         self._load_fn()
         self.scan_corder_data = self._load_scan_corder_data()
         self.extract_high_end_raw_calculations()
+        self.scan_corder_data = self.get_scan_corder_data()
 
     def __len__(self):
         """Returns length of all devices in order (Bio Science, Scan coder, Low cost)"""
@@ -90,6 +91,20 @@ class SpectralDataset(Dataset):
             return None
         else:
             raise ValueError("Unsupported device code provided")
+        
+    def len_scan_corder_data(self):
+        """Computes the lenght of scan corder data"""
+        return self.scan_corder_data.shape[0]
+
+    def get_scan_corder_item(self, index):
+        """Returns a scan corder reading by index"""
+        LOW_TARGET_INDEX_BOUND = 3
+        _len = self.len_scan_corder_data()
+        assert 0 <= index <= _len, f'Index out of range max({_len})'
+        _values = self.scan_corder_data.iloc[index][LOW_TARGET_INDEX_BOUND: ].values
+        return np.array(_values).astype(np.float32)
+
+
 
     def clean_low_cost_cols(self, df, index):
         """Cleans and formats cols for the low cost device"""
@@ -119,6 +134,7 @@ class SpectralDataset(Dataset):
 
     @staticmethod
     def get_label(reading):
+        """Concatenates the plant label and period for unique labels"""
         PERIOD_INDEX, NAME_INDEX = 3, -1
         reading = reading.split('/')
         _period, dynamic_name = reading[PERIOD_INDEX], reading[NAME_INDEX]
@@ -130,6 +146,21 @@ class SpectralDataset(Dataset):
             dynamic_name = dynamic_name.split('.')[0]
         return dynamic_name + _period, dynamic_label
 
+    @staticmethod
+    def get_week_for_scan_corder_reading(reading):
+        """Extracts the scan corder week"""
+        return reading.split('/')[-1].split('.')[0][-1]
+    
+    def get_scan_corder_data(self):
+        """Concatenates the tracked csvs for the scan corder from the data"""
+        dfs = []
+        NULL_COL = 'Token ID'
+        for week_data in self.tracked_csvs:
+            df = pd.read_csv(week_data).drop(columns=NULL_COL)
+            _period = SpectralDataset.get_week_for_scan_corder_reading(week_data)
+            df['week'] = _period
+            dfs.append(df)
+        return pd.concat(dfs)
     
     def extract_high_end_raw_calculations(self):
         file_hash = dict()
