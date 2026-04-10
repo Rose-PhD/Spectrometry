@@ -17,10 +17,23 @@ class Device(Enum):
     SCAN_CODER = 1
     LOW_COST = 2
 
+    @classmethod
+    def get_devices(cls):
+        """Returns the names of the devices in the enum"""
+        return list(cls)
+    
+    @classmethod
+    def get_device_names(cls):
+        return [device.name for device in cls]
+
+
+
 class FileFormats(Enum):
+    """Data file formats"""
     csv = ".csv"
     png = ".png"
     json = ".json"
+
 
 
 class Dataset(ABC):
@@ -40,57 +53,56 @@ class Dataset(ABC):
 class SpectralDataset(Dataset):
     """Loads spectral dataset based on device code provided"""
 
-    def __init__(self, data_path: str):
+    def __init__(self, data_path: str, device: Device):
+        """Shared state across all devices"""
         self.data_path = data_path
-    
-        self.tracked_xlsx = [] 
-        self.tracked_csvs = []
+        self.device = device
+        self.tracked_xlsx = []
 
-        self.high_end_csvs = []
-        self.low_cost_csvs = []
-        self.low_cost_imgs = []
+        """Dynamic state declaration"""
+        if device == Device.SCAN_CODER: 
+            self.tracked_csvs = []
 
-        self.high_end_raw_files = []
-        self.high_end_calculation_files = []
-        
-        # Loading data
-        """
-        TODO:
-            - Concatenate the the scan corder readings 
-        """
+        elif device == Device.BIO_SCIENCE:
+            self.high_end_csvs = []
+            self.high_end_raw_files = []
+            self.high_end_calculation_files = []
+        elif device == Device.LOW_COST:
+            self.low_cost_csvs = []
+            self.low_cost_imgs = []
+
+        """ Dynamic load functions"""
         self._load_fn()
-        self.scan_corder_data = self._load_scan_corder_data()
-        self.extract_high_end_raw_calculations()
-        self.scan_corder_data = self.get_scan_corder_data()
+        if device == Device.SCAN_CODER:
+            # self.scan_corder_data = self._load_scan_corder_data()
+            self.scan_corder_data = self.get_scan_corder_data()
+        elif device == Device.BIO_SCIENCE:
+            self.extract_high_end_raw_calculations()
+        
 
     def __len__(self):
-        """Returns length of all devices in order (Bio Science, Scan coder, Low cost)"""
-        pass
+        """Computest the length of the state obj of the current device"""
+        _len = None
+        
+        if self.device == Device.BIO_SCIENCE:
+            _len = len(self.high_end_raw_files)
+        elif self.device == Device.SCAN_CODER:
+            _len = self.len_scan_corder_data()
+        elif self.device == Device.LOW_COST:
+            NO_SAMPLED_POINTS_FOR_LOW_COST = 2
+            _len = len(self.low_cost_csvs) * NO_SAMPLED_POINTS_FOR_LOW_COST
+        return _len
 
-    def len(self, device:Device):
-        """Returns the lens of dataset based on the device code specified"""
-        if device == Device.SCAN_CODER:
-            return self.scan_corder_data.shape[0]
-        elif device == Device.BIO_SCIENCE:
-            return len(self.high_end_csvs)
-        
-        elif device == Device.LOW_COST:
-            return len(self.low_cost_csvs)
-        else:
-            raise ValueError("Unsupported device")
     
-    def __getitem__(self, index, device: Device):
-        """Generic functions that dynamically determines the device to load for preprocessing"""
-        if device == Device.LOW_COST:
-            return self.get_low_cost_item(index, device)
-        
-        elif device == Device.BIO_SCIENCE:
-            return self.get_high_end_item(index, device)
-        
-        elif device == Device.SCAN_CODER:
-            return None
+    def __getitem__(self, index):
+        """Generic function for extraction of item from data"""
+        if self.device == Device.SCAN_CODER:
+            return self.get_scan_corder_item(index)
+        elif self.device == Device.LOW_COST:
+            return self.get_low_cost_item(index)
         else:
-            raise ValueError("Unsupported device code provided")
+            return self.get_high_end_item(index)
+
         
     def len_scan_corder_data(self):
         """Computes the lenght of scan corder data"""
@@ -103,7 +115,6 @@ class SpectralDataset(Dataset):
         assert 0 <= index <= _len, f'Index out of range max({_len})'
         _values = self.scan_corder_data.iloc[index][LOW_TARGET_INDEX_BOUND: ].values
         return np.array(_values).astype(np.float32)
-
 
 
     def clean_low_cost_cols(self, df, index):
@@ -259,7 +270,8 @@ class SpectralDataset(Dataset):
         for root in os.listdir(data_path):
             root_dir = os.path.join(data_path, root)
             if root.endswith(".csv"):
-                self.high_end_csvs.append(week_dir)
+                if self.device == Device.BIO_SCIENCE:
+                    self.high_end_csvs.append(week_dir)
                 continue
             for week in os.listdir(root_dir):
                 week_dir = os.path.join(root_dir, week)
@@ -267,14 +279,16 @@ class SpectralDataset(Dataset):
                     self.tracked_xlsx.append(week_dir)
                     continue
                 elif week.endswith(".csv"):
-                    self.high_end_csvs.append(week_dir)
+                    if self.device == Device.BIO_SCIENCE:
+                        self.high_end_csvs.append(week_dir)
                     continue
                 for device in os.listdir(week_dir):
                     device_dir = os.path.join(week_dir, device)
                     for cat in os.listdir(device_dir):
                         cat_dir = os.path.join(device_dir, cat)
                         if cat.endswith(".csv"):
-                            self.tracked_csvs.append(cat_dir)
+                            if self.device == Device.SCAN_CODER:
+                                self.tracked_csvs.append(cat_dir)
                             continue
                         for disease_cat in os.listdir(cat_dir):
                             disease_cat_dir = os.path.join(cat_dir, disease_cat)
@@ -285,20 +299,27 @@ class SpectralDataset(Dataset):
                                 for specimen in os.listdir(point_dir):
                                     specimen_dir = os.path.join(point_dir, specimen)
                                     if specimen.endswith(".csv"):
-                                        self.high_end_csvs.append(specimen_dir)
+                                        if self.device == Device.BIO_SCIENCE:
+                                            self.high_end_csvs.append(specimen_dir)
                                         continue
                                     elif specimen.endswith(".png"):
                                         continue
                                     for sub in os.listdir(specimen_dir):
                                         sub_dir = os.path.join(specimen_dir, sub)
                                         if sub.endswith(".jpg"):
-                                            self.low_cost_imgs.append(sub_dir)
+                                            if self.device == Device.LOW_COST:
+                                                self.low_cost_imgs.append(sub_dir)
+                                            continue
                                         elif "data" in sub and sub.endswith(".csv"):
-                                            self.low_cost_csvs.append(sub_dir)
+                                            if self.device == Device.LOW_COST:
+                                                self.low_cost_csvs.append(sub_dir)
+                                            continue
                                         elif sub.endswith(".png"):
                                             continue
                                         elif sub.endswith(".csv") and "data" not in sub:
-                                            self.high_end_csvs.append(sub_dir)                         
+                                            if self.device == Device.BIO_SCIENCE:
+                                                self.high_end_csvs.append(sub_dir)
+                                            continue                         
 
 
 
