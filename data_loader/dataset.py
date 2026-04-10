@@ -57,6 +57,8 @@ class SpectralDataset(Dataset):
         """Shared state across all devices"""
         self.data_path = data_path
         self.device = device
+        self.wavelength = None
+        self.DONE_COMPUTING_WAVELENGTH = False
         self.tracked_xlsx = []
 
         """Dynamic state declaration"""
@@ -70,6 +72,7 @@ class SpectralDataset(Dataset):
         elif device == Device.LOW_COST:
             self.low_cost_csvs = []
             self.low_cost_imgs = []
+            
 
         """ Dynamic load functions"""
         self._load_fn()
@@ -89,8 +92,7 @@ class SpectralDataset(Dataset):
         elif self.device == Device.SCAN_CODER:
             _len = self.len_scan_corder_data()
         elif self.device == Device.LOW_COST:
-            NO_SAMPLED_POINTS_FOR_LOW_COST = 2
-            _len = len(self.low_cost_csvs) * NO_SAMPLED_POINTS_FOR_LOW_COST
+            _len = len(self.low_cost_csvs) 
         return _len
 
     
@@ -121,7 +123,9 @@ class SpectralDataset(Dataset):
         """Cleans and formats cols for the low cost device"""
         df_cols = df.columns
         target_cols = ['spectral_1', 'spectral_2', 'calibration']
-        if 'wavelength' in df_cols:
+        _includes_wavelength = 'wavelength' in df_cols
+   
+        if  _includes_wavelength and not self.DONE_COMPUTING_WAVELENGTH:
             target_cols.extend(['wavelength'])
 
         extracted_vals = []
@@ -131,17 +135,19 @@ class SpectralDataset(Dataset):
                 data_v = data_v['intensity']
             data_v = np.array(data_v)
             extracted_vals.append(data_v)
-        avg_spectral = (extracted_vals[0] + extracted_vals[1]) / 2
-        wavelength = extracted_vals[-1] if 'wavelength' in target_cols else None
-        return wavelength, avg_spectral
+        # avg_spectral = (extracted_vals[0] + extracted_vals[1]) / 2
+        if not self.DONE_COMPUTING_WAVELENGTH and _includes_wavelength:
+            self.wavelength = extracted_vals[-1].astype(np.float32)
+        return np.vstack([extracted_vals[0], extracted_vals[1]]).astype(np.float32)
 
-    def get_low_cost_item(self, index, device: Device):
-        """Loads and preprocesses data for the low cost"""
-        assert index <= 0 <= self.len(Device.LOW_COST), f'Index out of range, maximum supporte for low cost device is {self.len(Device.LOW_COST)}'
+    def get_low_cost_item(self, index):
+        """Loads low cost spectral item"""
+        _len = len(self)
+        assert index <= index <= _len, f'Index out of range,  max({_len})'
         spectral_url, img_url = self.low_cost_csvs[index], self.low_cost_imgs[index]
         specimen_df = pd.read_csv(spectral_url)
-        specimen_df = self.clean_low_cost_cols(specimen_df, index)
-        return specimen_df[0], specimen_df[-1], img_url
+        return self.clean_low_cost_cols(specimen_df, index)
+        
 
     @staticmethod
     def get_label(reading):
@@ -250,19 +256,26 @@ class SpectralDataset(Dataset):
         return df
     
     def get_high_end_item(self, index):
-        assert 0 <= index <= self.len(device=Device.BIO_SCIENCE), f'Index out of range max({self.len(device=Device.BIO_SCIENCE)})'
+        """Loads a single item for high end spectrometer"""
+        _len = len(self)
+        assert 0 <= index <= _len, f'Index out of range max({_len})'
         
         raw_dir = self.high_end_raw_files[index]
         calculations_dir = self.high_end_calculation_files[index]
 
         raw_readings = pd.read_csv(raw_dir, skiprows=6, nrows=3648)
-        calibration_values = pd.read_csv(raw_dir, skiprows=3662)
-
         raw_readings.columns = SpectralDataset.clean_high_end_cols(raw_readings)
-        calibration_values.columns = SpectralDataset.clean_high_end_cols(calibration_values)
+    
+        """comment out for computation of calibration values"""
+        # calibration_values = pd.read_csv(raw_dir, skiprows=3662)
+        # calibration_values.columns = SpectralDataset.clean_high_end_cols(calibration_values)
 
         raw_readings = SpectralDataset.convert_high_end_cols(raw_readings)
-        return raw_readings, calibration_values        
+        if not self.DONE_COMPUTING_WAVELENGTH:
+            self.wavelength = np.array(raw_readings['wavelength'].values).astype(np.float32)
+        
+        return raw_readings[raw_readings.columns[-1]].values.astype(np.float32)
+   
 
 
     def _load_fn(self):
