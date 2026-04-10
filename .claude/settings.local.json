@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(source dev/bin/activate)",
-      "Bash(python -m pytest \"Spectral collections/utils/test_data_loader.py\" -v)"
-    ]
-  }
-}
