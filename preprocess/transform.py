@@ -1,5 +1,6 @@
 import numpy as np
 from abc import ABC, abstractmethod
+from scipy.stats import zscore
 
 class Transform(ABC):
     """Abstract class for all transformation performed on the data"""
@@ -52,8 +53,52 @@ class Range_Clip(Transform):
         
         return x_clipped, wavelength_clipped
 
-         
 
+class Zscore_Outlier_Filter(Transform):
+    """Removes outliers from the data using the z_score keeping values under outlier boundary"""
+    def __init__(self, boundary:int = 3):
+        self._tot_outliers = 0
+        self.boundary = boundary
+    
+    def forward(self, x_data):
+        """Computes z_score and removes values under outlier boundary"""
+
+        z_score = np.abs(zscore(x_data))
+        mask = (z_score < self.boundary).all(axis= 1)
+
+        x_clean = x_data[mask]
+        self._tot_outliers += (~mask).sum()
+
+        return x_clean
+         
+        
+    def get_outlier_count(self):
+        assert not self._tot_outliers == 0, f'Run the forward method to precompute the outliers'
+        return self._tot_outliers 
+
+
+class Bound_Outlier_Filter(Transform):
+    """Filters out values that result from incorrect sensor values"""
+
+    def __init__(self, lower_bound: float =0, upper_bound: float=1.0):
+        self.lower_bound = lower_bound
+        self.upper_bound = upper_bound
+        self._tot_removed = 0
+
+    def forward(self, x_data: np.ndarray):
+        """Computes the  mask and removes values in tensor that are below or abocve boundary"""
+        
+        mask = ((x_data >= self.lower_bound) & (x_data <= self.upper_bound)).all(axis=1)
+        x_cleaned = x_data[mask]
+        
+        self._tot_removed += (~mask).sum()
+        return x_cleaned
+    
+    def get_removed_count(self):
+        """Returns the number of removed rows with outliers"""
+        assert not self._tot_removed == 0, f'Call forward method to compute the removed count'
+        return self._tot_removed
+        
 
 
     
