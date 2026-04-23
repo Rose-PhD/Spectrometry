@@ -3,6 +3,7 @@ pandas==3.0.2
 matplotlib==3.10.8
 scipy==1.17.1
 scikit-learn==1.8.0
+sklearn-lvq
 sklvq
 
 -e git+ssh://git@github.com/wilfredKisitu/spectro_Sample.git@d41dedf5478e8333fee08b918c076ab42a20185a#egg=spectrometry
