@@ -4,3 +4,4 @@ spectral_data
 .ipynb_checkpoints
 __pycache__
 *.egg-info
+*.csv
