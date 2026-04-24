@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
+from torch.utils.data import random_split
 
 torch.manual_seed(0)
-
 
 def initiate_prototypes(X: torch.Tensor, y: torch.Tensor, n_classes: int):
     """Initaliazation of prototypes"""
@@ -34,7 +34,7 @@ class GMLVQLoss(nn.Module):
     """Computes the GMLVQ Loss and applies a non linear activation"""
     def forward(self, d_correct, d_wrong, EPS=1e-8):
         mu = (d_correct - d_wrong) / (d_correct + d_wrong + EPS)
-        return torch.relu(mu)
+        return mu
     
 
 class GMLVQ(nn.Module):
@@ -60,7 +60,7 @@ class GMLVQ(nn.Module):
         diff = x.unsqueeze(0) - self.w
         return (r * diff * diff).sum(dim=1)
 
-    def fit(self, X: torch.Tensor, y: torch.Tensor):
+    def fit(self, X: torch.Tensor, y: torch.Tensor, print_step=2):
         """Computes the relevance matrix through iterative algorithms"""
         n_classes = len(y.unique())
         prototypes, proto_labels = initiate_prototypes(X, y, n_classes)
@@ -86,11 +86,11 @@ class GMLVQ(nn.Module):
 
                 epoch_loss += loss.item()
             
-            if (epoch + 1) % 10 == 0:
+            if (epoch + 1) % print_step == 0:
                 print(f'Epoch: {epoch + 1} / {self.epochs}', f'loss: {epoch_loss / len(X):.4f}', sep='\t|')
     
     @torch.no_grad()
-    def predict(self, X: torch.Tensor, y: torch.Tensor):
+    def predict(self, X: torch.Tensor):
         """Computes the predictions on X"""
         preds = []
         for x in X:
@@ -102,15 +102,15 @@ class GMLVQ(nn.Module):
     @torch.no_grad()
     def score(self, X: torch.Tensor, y: torch.Tensor):
         """Computes the mean square score"""
-        return (self.predict(X, y) == y).float().mean().item()
+        return (self.predict(X) == y).float().mean().item()
 
 
 if __name__ == '__main__':
-    from sklearn.datasets import load_iris
-    from torch.utils.data import random_split
+    from sklearn.datasets import load_breast_cancer
     import os
+    from sklearn.metrics import classification_report
 
-    X, y = load_iris(return_X_y=True)
+    X, y = load_breast_cancer(return_X_y=True)
     X = torch.tensor(X, dtype=torch.float32)
     y = torch.tensor(y, dtype=torch.float32)
 
@@ -131,6 +131,9 @@ if __name__ == '__main__':
     model.fit(x_train, y_train)
     test_score = model.score(x_test, y_test)
     print(f'Test score: {test_score}')
+
+    y_preds = model.predict(x_test)
+    print(classification_report(y_test, y_preds))
 
 
 
