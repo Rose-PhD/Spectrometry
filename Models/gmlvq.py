@@ -56,7 +56,7 @@ class GMLVQ(nn.Module):
 
     def _distance(self, x: torch.Tensor):
         """Computes the distance of separation in new d space"""
-        r = torch.softmax(self.r, dim=0)
+        r = torch.clamp(self.r, min=1e-6)
         diff = x.unsqueeze(0) - self.w
         return (r * diff * diff).sum(dim=1)
 
