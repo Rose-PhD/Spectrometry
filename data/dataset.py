@@ -7,7 +7,7 @@ import numpy as np
 import ast
 
 
-data_path = Path("../spectral_data")
+data_path = Path("spectral_data")
 WEEK_NAME_INDEX = -1
 WEEK_NO_INDEX = -5
 
@@ -60,6 +60,7 @@ class SpectralDataset(Dataset):
         self.wavelength = None
         self.DONE_COMPUTING_WAVELENGTH = False
         self.tracked_xlsx = []
+        self.expert_files = []
 
         """Dynamic state declaration"""
         if device == Device.SCAN_CODER: 
@@ -294,8 +295,10 @@ class SpectralDataset(Dataset):
             root_dir = os.path.join(data_path, root)
             if root.endswith(".csv"):
                 if self.device == Device.BIO_SCIENCE:
-                    self.high_end_csvs.append(week_dir)
+                    self.high_end_csvs.append(root_dir)
                 continue
+            if root.endswith(".xlsx"):
+                self.expert_files.append(root_dir)
             for week in os.listdir(root_dir):
                 week_dir = os.path.join(root_dir, week)
                 if week.endswith(".xlsx"):
@@ -346,3 +349,14 @@ class SpectralDataset(Dataset):
 
 
 
+if __name__ == '__main__':
+    """Correct collection of the meta data information for each crop before loading"""
+    import os
+    os.system('clear')
+
+    dat_path = './spectral_data'
+    for device in Device.get_devices():
+        dataset = SpectralDataset(data_path, device)
+        x, y = dataset[0]
+        print(f'Working with {device.value}', f'x_data shape: {x.shape}', f'y_data shape: {y.shape}', sep='\t| ')
+    
