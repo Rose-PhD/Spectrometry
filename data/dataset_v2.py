@@ -13,7 +13,7 @@ TODO:
     This is to enable working with spectral dataset and images simultenously
 """
 
-class SpectralDataset_v2:
+class SpectralDataset_v2(Dataset):
     def __init__(self, data_path, device: Device, label_extra_week: int= 4):
         """
         Class wrapper for loading spectral data for specific device
@@ -96,13 +96,13 @@ class SpectralDataset_v2:
             leaf_label = self.extract_low_cost_label(leaf_data_dir)
             # Handle creation of new leaf labels
             if leaf_label not in self.weeks[week].keys():
-                self.weeks[week][leaf_label] = {'raw': None, 'img': None}
+                self.weeks[week][leaf_label] = {'raw': [], 'img': []}
             
             # Handle storage of leaf and image data
             if leaf_data_dir.endswith('.jpg'):
-                self.weeks[week][leaf_label]['img'] = leaf_data_dir
+                self.weeks[week][leaf_label]['img'].append(leaf_data_dir)
             else:
-                self.weeks[week][leaf_label]['raw'] = leaf_data_dir
+                self.weeks[week][leaf_label]['raw'].append(leaf_data_dir)
 
     
     def _load_fn(self):
@@ -189,6 +189,19 @@ class SpectralDataset_v2:
                                                 reading_dir,
                                                 specimen_data
                                             )
+    @staticmethod
+    def _generate_sort_key_LOW_COST(label: str):
+        """Generates sort key from give label for LOW_COST_DEVICE"""
+        first_letter = label[0]
+        last_number = int(re.findall(r'\d+$', label)[0]) # extract last numer
+        return (first_letter, last_number)
+    
+    @staticmethod
+    def _extract_disease_class_BIOSCIENCE(label):
+        """Extracts the disease class from BIO SCIENCE label"""
+        match = re.search(r'^[A-Z]\d+([A-Z]+)\d+$', label)
+        return match.group(1) if match else None
+
 
     def _create_device_meta_data_BIO_SCINECE(self):
         """Populates meta data from BIO SCIENCE DEVICE"""
@@ -197,13 +210,20 @@ class SpectralDataset_v2:
         for week in self.weeks.keys():
             smp_temp = {}
             for key in self.weeks[week].keys():
-                raw_count = len(self.weeks[week][key]['raw'])
-                calculation_count = len(self.weeks[week][key]['calculations'])
+                # extract raw and calculation data files
+                specimen_data_dirs = self.weeks[week][key]['raw']
+                calculation_data_dirs = self.weeks[week][key]['calculations']
+
+                # Count number of files in each case
+                raw_count = len(specimen_data_dirs)
+                calculation_count = len(calculation_data_dirs)
 
                 # create state for temporary object
                 smp_temp[key] = {
                     'raw_count': raw_count,
-                    'calculation_count': calculation_count
+                    'calculation_count': calculation_count,
+                    'specimen_data_dirs': specimen_data_dirs,
+                    'calculation_data_dirs': calculation_data_dirs
                 }
             temp_buffer[week] = smp_temp
             
@@ -211,17 +231,27 @@ class SpectralDataset_v2:
             rows = []
             for week, labels in temp_buffer.items():
                 for label, values in labels.items():
+                    # Exract plant types, plant number
+                    plant_type, plant_number = self._generate_sort_key_LOW_COST(label)
+                    disease_class = self._extract_disease_class_BIOSCIENCE(label)
                     rows.append({
                         'week': week,
                         'label': label,
+                        'plant_type': plant_type,
+                        'disease_class': disease_class,
+                        'plant_number': plant_number,
                         'raw_count': values['raw_count'],
-                        'calculation_count': values['calculation_count']
+                        'calculation_count': values['calculation_count'],
+                        'specimen_data_dirs': values['specimen_data_dirs'],
+                        'calculation_data_dirs': values['calculation_data_dirs']
+                    
                     })
         # update underlying states
         self.meta_data = pd.DataFrame(rows)
         self.labels = list(self.meta_data[self.meta_data['week'] == self.label_extra_week]['label'])
 
-        
+
+
 
     def _create_device_meta_data_LOW_COST(self):
         """Populates meta data from LOW COST DEVICE"""
@@ -229,14 +259,18 @@ class SpectralDataset_v2:
         for week in self.weeks.keys():
             smp_temp = {}
             for key in self.weeks[week].keys():
-                has_raw = 0
-                has_img = 0
-                if self.weeks[week][key]['raw'] is not None:
-                    has_raw += 1
-                
-                if self.weeks[week][key]['img'] is not None:
-                    has_img += 1
-                smp_temp[key] = {'raw_count': has_raw, 'img_count': has_img}
+                specimen_data_dirs = self.weeks[week][key]['raw']
+                img_data_dirs = self.weeks[week][key]['img']
+
+                raw_count = len(specimen_data_dirs)
+                img_count = len(img_data_dirs)
+            
+                smp_temp[key] = {
+                    'raw_count': raw_count, 
+                    'img_count': img_count,
+                    'specimen_data_dirs': specimen_data_dirs,
+                    'img_data_dirs': img_data_dirs 
+                }
             
             temp_buff[week] = smp_temp
 
@@ -244,16 +278,41 @@ class SpectralDataset_v2:
         rows = []
         for week, labels in temp_buff.items():
             for label, values in labels.items():
+                
+                # extract the sort keys and disease_category
+                plant_type, plant_number = self._generate_sort_key_LOW_COST(label)
+                specimen_data_dir = values['specimen_data_dirs']
+                disease_cat = specimen_data_dir[0].split('/')[5]
+
                 rows.append({
                     'week': week,
                     'label': label,
+                    'plant_type': plant_type,
+                    'plant_code_number': plant_number,
+                    'disease_class': disease_cat,
                     'raw_count': values['raw_count'],
-                    'img_count': values['img_count']
+                    'img_count': values['img_count'],
+                    'specimen_data_dirs': specimen_data_dir,
+                    'img_data_dirs': values['img_data_dirs']
                 })
 
         # update the underlying states
         self.meta_data = pd.DataFrame(rows)
         self.labels = list(self.meta_data[self.meta_data['week'] == self.label_extra_week]['label'])
+
+    
+    def _extract_other_mata_info_SCAN_CORDER(self, label):
+        """Extracts the sort key, plant type and disease type"""
+        # keep only first two sections
+        cleaned = ' '.join(label.split()[:2])
+        match = re.search(r'^([A-Z])(\d+)\s+([A-Z]+)(\d+)$', cleaned)
+        if match:
+            first_letter = match.group(1)
+            # first_number = int(match.group(2))
+            disease = match.group(3)
+            second_number = int(match.group(4))
+            return (cleaned, first_letter,  disease, second_number)
+        return None
 
     
     def _create_device_meta_data_SCAN_CORDER(self):
@@ -265,10 +324,18 @@ class SpectralDataset_v2:
             pd_smp['week'] = week
             temp_df_buffer.append(pd_smp)
         
+        # clean and update the underlying states
         self.meta_data = pd.concat(temp_df_buffer)
-        self.labels = list(
-            self.meta_data[self.meta_data['week'] == self.label_extra_week]['Sample ID']
+        self.meta_data = self.meta_data.drop(columns=['UUID', 'Token ID', 'Timestamp']).rename(columns={'Sample ID': 'label'})
+
+        # Extract additional meta information
+        self.meta_data[['clean_label', 'plant_type',  'disease_class', 'plant_number']] = (
+            self.meta_data['label']
+            .apply(self._extract_other_mata_info_SCAN_CORDER)
+            .apply(pd.Series)
         )
+        self.labels = list(self.meta_data[self.meta_data['week'] == self.label_extra_week]['clean_label'].unique())
+
         
 
     def _load_meta_data(self):
@@ -282,6 +349,28 @@ class SpectralDataset_v2:
             self._create_device_meta_data_SCAN_CORDER()
         else:
             raise ValueError(f'Unsupported device')
+
+
+    def __len__(self):
+        """Return the length of the dataset for the underlying device"""
+        return self.meta_data.shape[0]
+
+    def get_specimen_count(self):
+        if self.device == Device.SCAN_CODER:
+            return len(self)
+        else:
+            total_files = self.meta_data['raw_count'].sum()
+            if self.device == Device.LOW_COST:
+                NO_OF_READING_PER_FILE = 2
+                total_files = total_files * NO_OF_READING_PER_FILE
+            return total_files
+
+    
+    def __getitem__(self):
+        """Extracts a single item to be batched"""
+        pass
+    
+
         
 if __name__ == '__main__':
     import os 
@@ -290,10 +379,13 @@ if __name__ == '__main__':
     os.system('clear')
     for device in Device.get_devices():
         dataset = SpectralDataset_v2(DATA_PATH, device=device)
-        print(f'Device: {device.name}', f'Data size: {dataset.meta_data.shape}', f'No of labels: {len(dataset.labels)}', sep='\t| ')
-        print(f'Unique weeks: {dataset.weeks.keys()}')
-        print(f'Data Labels to be sorted: {dataset.labels}')
-        print("="*190)
+        print(f'Device: {device.name}', f'No of labels: {len(dataset.labels)}', f'Dataset length: {len(dataset)}',sep='\n')
+        print(f'Number of readings: {dataset.get_specimen_count()}')
+        print(f'Unique weeks: {list(dataset.weeks.keys())}')
+        print(dataset.meta_data.tail(50))
+        print("."*200)
+
+
 
 
         
