@@ -248,6 +248,12 @@ class SpectralDataset_v2(Dataset):
                     })
         # update underlying states
         self.meta_data = pd.DataFrame(rows)
+        self.meta_data = self.meta_data.sort_values(by = [
+            'week',
+            'plant_type',
+            'disease_class',
+            'plant_number'
+        ]).reset_index(drop=True)
         self.labels = list(self.meta_data[self.meta_data['week'] == self.label_extra_week]['label'])
 
 
@@ -288,8 +294,8 @@ class SpectralDataset_v2(Dataset):
                     'week': week,
                     'label': label,
                     'plant_type': plant_type,
-                    'plant_code_number': plant_number,
                     'disease_class': disease_cat,
+                    'plant_number': plant_number,
                     'raw_count': values['raw_count'],
                     'img_count': values['img_count'],
                     'specimen_data_dirs': specimen_data_dir,
@@ -298,6 +304,12 @@ class SpectralDataset_v2(Dataset):
 
         # update the underlying states
         self.meta_data = pd.DataFrame(rows)
+        self.meta_data = self.meta_data.sort_values(by = [
+            'week',
+            'plant_type',
+            'disease_class',
+            'plant_number'
+        ]).reset_index(drop=True)
         self.labels = list(self.meta_data[self.meta_data['week'] == self.label_extra_week]['label'])
 
     
@@ -334,6 +346,12 @@ class SpectralDataset_v2(Dataset):
             .apply(self._extract_other_mata_info_SCAN_CORDER)
             .apply(pd.Series)
         )
+        self.meta_data = self.meta_data.sort_values(by = [
+            'week',
+            'plant_type',
+            'disease_class',
+            'plant_number'
+        ]).reset_index(drop=True)
         self.labels = list(self.meta_data[self.meta_data['week'] == self.label_extra_week]['clean_label'].unique())
 
         
@@ -365,6 +383,10 @@ class SpectralDataset_v2(Dataset):
                 total_files = total_files * NO_OF_READING_PER_FILE
             return total_files
 
+    def get_weekly_data(self, week: int):
+        """Returns data for a specific week"""
+        return self.meta_data[self.meta_data['week'] == week]
+
     
     def __getitem__(self):
         """Extracts a single item to be batched"""
@@ -382,7 +404,12 @@ if __name__ == '__main__':
         print(f'Device: {device.name}', f'No of labels: {len(dataset.labels)}', f'Dataset length: {len(dataset)}',sep='\n')
         print(f'Number of readings: {dataset.get_specimen_count()}')
         print(f'Unique weeks: {list(dataset.weeks.keys())}')
-        print(dataset.meta_data.tail(50))
+        WEEK = 11
+        if device == Device.SCAN_CODER:
+            print(dataset.get_weekly_data(WEEK).head(50))
+        else:
+            print(dataset.get_weekly_data(WEEK))
+    
         print("."*200)
 
 
