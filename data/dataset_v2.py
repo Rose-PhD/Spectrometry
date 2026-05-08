@@ -3,14 +3,15 @@ from data.dataset import Device
 import pandas as pd
 import re
 from data.dataset import Dataset
+from typing import List, Tuple
 
 DATA_PATH = 'spectral_data' 
 
 """
 TODO:
-    If device is not LOW_COST load low cost images to facilitate access to image data
-    This applies to SCAN_CODER and BIO_SCIENCE
-    This is to enable working with spectral dataset and images simultenously
+    Merging the chemical reading data with device meta data
+    Ensure consistent merging with Low-cost device
+    Redistribute the images to each device
 """
 
 class SpectralDataset_v2(Dataset):
@@ -429,9 +430,8 @@ class SpectralDataset_v2(Dataset):
         return grouped_df
     
     @staticmethod
-    def _rename_df(df: pd.DataFrame):
+    def _rename_df(df: pd.DataFrame, new_col_names: List[str] = ['plant_number', 'score', 'titer_1', 'l_1', 'titer_2', 'l_2', 'titer_3', 'l3']):
         """Renames columns to a consistent format"""
-        new_col_names= ['plant_number', 'score', 'titer_1', 'l_1', 'titer_2', 'l_2', 'titer_3', 'l3']
         col_names = list(df.columns)
         rename_dict = {old_col: new_col for old_col, new_col in zip(col_names, new_col_names)}
         return df.rename(columns=rename_dict)
@@ -474,7 +474,66 @@ class SpectralDataset_v2(Dataset):
         mln_df = self._rename_df(mln_df)
         msv_df = self._rename_df(msv_df)
         return (mln_df, msv_df)
+    
+    
+    def _get_expert_files_CASSAVA_CMD(self, df_path:str):
+        """Extracts expert readings for CMD only from the source file"""
+        week_col = 'CBSD'
+        cmd_df = pd.read_excel(df_path, sheet_name='CMD')
 
+        # build a mask for rows with weeks of type str
+        cmd_df['week'] = cmd_df[week_col].astype(str).str.extract(r'WEEK\s*(\d+)', expand=False)
+        cmd_df['week'] = cmd_df['week'].ffill()         # apply a forward fill
+
+        # drop rows with week rows
+        cmd_df = cmd_df[~cmd_df[week_col].astype(str).str.contains(r'WEEK', case=False, na=False)]
+        cmd_df = cmd_df.reset_index(drop=True)          # rest index
+        new_col_names = ['plant_number', 'score', 'titer_1', 'l_1' ,'titer_2','l_2', 'titer_3', 'l3', 'week']
+        cmd_df = self._rename_df(cmd_df, new_col_names)
+
+        # extracting plant numbers only
+        cmd_df['plant_number'] = cmd_df['plant_number'].astype(str).str.extract(r'(\d+)')[0].astype(int)
+        cmd_df['week'] = cmd_df['week'].fillna(1)   # fill the first week of NaNs with 1
+        cmd_df['disease_class'] = 'CMD'             # fill in disease class
+        return cmd_df
+    
+    def _get_expert_files_CASSAVA_CBB(self, df_path:str):
+        """Extracts expert readings for CBB only from the source file"""
+        week_col = 'Cassava bacterial blight'
+        cbb_df = pd.read_excel(df_path, sheet_name='CBB')
+
+        week_mask = cbb_df.iloc[:, 0].astype(str).str.match(r'^\s*week\s*\d+', case=False, na=False)    # create mask for rows with weeks type str
+        cbb_df['week'] = cbb_df.iloc[:, 0].where(week_mask).str.extract(r'(\d+)', expand=False)         # apply mask
+        cbb_df['week'] = cbb_df['week'].ffill()     # forward fill the weeks
+        cbb_df = cbb_df[~week_mask].copy()          # drop cols with week strs
+        cbb_df = cbb_df.drop(0).reset_index(drop=True) # drop column 0 with custom labels
+
+        # format column names
+        new_col_names = ['plant_number', 'description', 'score' ,'titer_1', 'l_1' ,'titer_2','l_2', 'titer_3', 'l2', 'week']
+        cbb_df = self._rename_df(cbb_df, new_col_names)
+
+        # extract plant numbers only
+        cbb_df['plant_number'] = cbb_df['plant_number'].astype(str).str.extract(r'(\d+)')[0].astype(int)
+        cbb_df['disease_class'] = 'CBB'                # fill disease class
+        cbb_df = cbb_df.drop(columns=['description']) # drop description column to ensure consistency
+        
+        return cbb_df
+    
+    def _get_expert_file_CASSAVA(self, df_path: str) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        """
+        Wrapper function that computes and returns expert files for CMD, and CBB
+
+        Arg:
+            df_path -> str: path to where expert files for cassav is stored
+
+        Return (Tuple):
+            CMD_df -> pd.DataFrame: dataframe containing chemical meta data for CMD
+            CBB_df -> pd.DataFrame: dataframe containing chemical meta data fro CBB
+        """
+        cmd_df = self._get_expert_files_CASSAVA_CMD(df_path)
+        cbb_df = self._get_expert_files_CASSAVA_CBB(df_path)
+        
+        return (cmd_df, cbb_df)
 
 
     def get_weekly_data(self, week: int):
@@ -487,7 +546,6 @@ class SpectralDataset_v2(Dataset):
         """Extracts a single item to be batched"""
         pass
     
-
         
 if __name__ == '__main__':
     import os 
@@ -520,6 +578,15 @@ if __name__ == '__main__':
             print(mln_df)
             print('*'*100)
             print(msv_df)
+            print('*'*100)
+        elif 'cassava' in file and '~' not in file:
+            print(file)
+            cmd_df, cbb_df = dataset._get_expert_file_CASSAVA(file)
+            print(cmd_df)
+            print('*'*100)
+            print(cbb_df)
+            print('*'*100)
+        
 
 
 
