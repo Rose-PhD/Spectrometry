@@ -254,8 +254,13 @@ class SpectralDataset_v2(Dataset):
             'disease_class',
             'plant_number'
         ]).reset_index(drop=True)
+        # Building a unique sample index 
+        self.meta_data['search_label'] = (
+            self.meta_data['plant_type'].astype(str) +
+            self.meta_data['disease_class'].astype(str) +
+            self.meta_data['plant_number'].astype(str)
+        )
         self.labels = list(self.meta_data[self.meta_data['week'] == self.label_extra_week]['label'])
-
 
 
 
@@ -310,6 +315,12 @@ class SpectralDataset_v2(Dataset):
             'disease_class',
             'plant_number'
         ]).reset_index(drop=True)
+        # Building a unique sample index 
+        self.meta_data['search_label'] = (
+            self.meta_data['plant_type'].astype(str) +
+            self.meta_data['disease_class'].astype(str) +
+            self.meta_data['plant_number'].astype(str)
+        )
         self.labels = list(self.meta_data[self.meta_data['week'] == self.label_extra_week]['label'])
 
     
@@ -352,7 +363,14 @@ class SpectralDataset_v2(Dataset):
             'disease_class',
             'plant_number'
         ]).reset_index(drop=True)
+        # Building a unique sample index 
+        self.meta_data['search_label'] = (
+            self.meta_data['plant_type'].astype(str) +
+            self.meta_data['disease_class'].astype(str) +
+            self.meta_data['plant_number'].astype(str)
+        )
         self.labels = list(self.meta_data[self.meta_data['week'] == self.label_extra_week]['clean_label'].unique())
+        self.meta_data = self._group_data_by_label_SCAN_CORDER() # compute and return batched scan corder data
 
         
 
@@ -382,6 +400,32 @@ class SpectralDataset_v2(Dataset):
                 NO_OF_READING_PER_FILE = 2
                 total_files = total_files * NO_OF_READING_PER_FILE
             return total_files
+        
+    
+    def _group_data_by_label_SCAN_CORDER(self):
+        """Bundles SCAN CORDER data to avoid duplication in the dataframe"""
+        grouped_samples = {}
+        self.wavelength_cols = [
+            '394', '445', '451', '517', '573',
+            '589', '591', '615', '632', '849',
+            '867', '946'
+        ]
+
+        for (week, label), group in self.meta_data.groupby(['week', 'search_label']):
+            grouped_samples[(week, label)] = {
+                'week': week,
+                'search_label': label,
+                'plant_type': group['plant_type'].iloc[0],
+                'disease_class': group['disease_class'].iloc[0],
+                'plant_number': group['plant_number'].iloc[0],
+                'specimen_reading': group[
+                    self.wavelength_cols
+                ].values.tolist()
+            }
+
+        # Convert dict back to pandas dataframe
+        grouped_df = pd.DataFrame(grouped_samples.values())  
+        return grouped_df
 
     def get_weekly_data(self, week: int):
         """Returns data for a specific week"""
@@ -398,17 +442,16 @@ if __name__ == '__main__':
     import os 
     from data.dataset import Device
 
+    week = input('Enter week to consider: ')
+    WEEK = int(week)
+
     os.system('clear')
     for device in Device.get_devices():
         dataset = SpectralDataset_v2(DATA_PATH, device=device)
         print(f'Device: {device.name}', f'No of labels: {len(dataset.labels)}', f'Dataset length: {len(dataset)}',sep='\n')
         print(f'Number of readings: {dataset.get_specimen_count()}')
-        print(f'Unique weeks: {list(dataset.weeks.keys())}')
-        WEEK = 11
-        if device == Device.SCAN_CODER:
-            print(dataset.get_weekly_data(WEEK).head(50))
-        else:
-            print(dataset.get_weekly_data(WEEK))
+        # WEEK = 1
+        print(dataset.get_weekly_data(WEEK))        
     
         print("."*200)
 
