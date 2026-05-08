@@ -14,7 +14,7 @@ TODO:
 """
 
 class SpectralDataset_v2(Dataset):
-    def __init__(self, data_path, device: Device, label_extra_week: int= 4):
+    def __init__(self, data_path, device: Device, label_extra_week: int= 9):
         """
         Class wrapper for loading spectral data for specific device
 
@@ -260,7 +260,7 @@ class SpectralDataset_v2(Dataset):
             self.meta_data['disease_class'].astype(str) +
             self.meta_data['plant_number'].astype(str)
         )
-        self.labels = list(self.meta_data[self.meta_data['week'] == self.label_extra_week]['label'])
+        self.labels = list(self.meta_data[self.meta_data['week'] == self.label_extra_week]['search_label'].unique())
 
 
 
@@ -321,7 +321,7 @@ class SpectralDataset_v2(Dataset):
             self.meta_data['disease_class'].astype(str) +
             self.meta_data['plant_number'].astype(str)
         )
-        self.labels = list(self.meta_data[self.meta_data['week'] == self.label_extra_week]['label'])
+        self.labels = list(self.meta_data[self.meta_data['week'] == self.label_extra_week]['search_label'].unique())
 
     
     def _extract_other_mata_info_SCAN_CORDER(self, label):
@@ -369,7 +369,7 @@ class SpectralDataset_v2(Dataset):
             self.meta_data['disease_class'].astype(str) +
             self.meta_data['plant_number'].astype(str)
         )
-        self.labels = list(self.meta_data[self.meta_data['week'] == self.label_extra_week]['clean_label'].unique())
+        self.labels = list(self.meta_data[self.meta_data['week'] == self.label_extra_week]['search_label'].unique())
         self.meta_data = self._group_data_by_label_SCAN_CORDER() # compute and return batched scan corder data
 
         
@@ -418,6 +418,7 @@ class SpectralDataset_v2(Dataset):
                 'plant_type': group['plant_type'].iloc[0],
                 'disease_class': group['disease_class'].iloc[0],
                 'plant_number': group['plant_number'].iloc[0],
+                'raw_count': len(group),
                 'specimen_reading': group[
                     self.wavelength_cols
                 ].values.tolist()
@@ -426,10 +427,60 @@ class SpectralDataset_v2(Dataset):
         # Convert dict back to pandas dataframe
         grouped_df = pd.DataFrame(grouped_samples.values())  
         return grouped_df
+    
+    @staticmethod
+    def _rename_df(df: pd.DataFrame):
+        """Renames columns to a consistent format"""
+        new_col_names= ['plant_number', 'score', 'titer_1', 'l_1', 'titer_2', 'l_2', 'titer_3', 'l3']
+        col_names = list(df.columns)
+        rename_dict = {old_col: new_col for old_col, new_col in zip(col_names, new_col_names)}
+        return df.rename(columns=rename_dict)
+    
+    def _get_expert_file_MAIZE(self, df_path: str):
+        """
+        Cleans the expert files for MAIZE records
+        Args:
+            df_path -> path to where expert files are stored
+        Returns (Tuple):
+            MLV_df -> panda.DataFrame of MLN readings
+            MSV_df -> panda.DataFrame of MSV readins
+        """
+
+        maize_df = pd.read_excel(df_path)
+        week_mask = maize_df.iloc[:, 0].astype(str).str.match(r'^\s*week\s+\d+\s*$', case=False, na=False) # get row postion of WEEKS in df
+        maize_df['week'] = maize_df.iloc[:, 0].where(week_mask).str.extract(r'(\d+)', expand=False)
+        maize_df['week'] = maize_df['week'].ffill()         # perform forward fill
+        maize_df['week'] = maize_df['week'].fillna(1)       # fill the first week with 1 
+
+        
+        maize_df = maize_df.drop(columns={'week 1', 'Disease description'})     # drop week 1 and Disease description
+        split_idx = maize_df.columns.get_loc('Symptom description.1')           # splitting index to extract MLN and MSV dfs
+
+        # Create MLN split and populate meta data
+        mln_df = maize_df.iloc[:, :split_idx+1]
+        mln_df['week'] = maize_df['week']
+        mln_df['disease_class'] = 'MLN'
+
+        # Create MSV df split and populate meta data
+        msv_df = maize_df.iloc[:, split_idx + 1:]
+        msv_df['DAY'] = maize_df['DAY']
+        msv_df['score'] = maize_df['score']
+        msv_df['disease_class'] = 'MSV'
+
+        # Rearrange the column position for msv_df to use shared renaming function
+        msv_df = msv_df[['DAY', 'score', 'MSV1', 'Symptom description (A= asymptomatic, S=Symptom)', 'MLN2', 'Unnamed: 13', 'MLN3.1', 'Unnamed: 15', 'week', 'disease_class']]
+
+        # Rename MLN and MSV df
+        mln_df = self._rename_df(mln_df)
+        msv_df = self._rename_df(msv_df)
+        return (mln_df, msv_df)
+
+
 
     def get_weekly_data(self, week: int):
         """Returns data for a specific week"""
         return self.meta_data[self.meta_data['week'] == week]
+    
 
     
     def __getitem__(self):
@@ -444,16 +495,31 @@ if __name__ == '__main__':
 
     week = input('Enter week to consider: ')
     WEEK = int(week)
+    labels = []
 
     os.system('clear')
     for device in Device.get_devices():
         dataset = SpectralDataset_v2(DATA_PATH, device=device)
-        print(f'Device: {device.name}', f'No of labels: {len(dataset.labels)}', f'Dataset length: {len(dataset)}',sep='\n')
-        print(f'Number of readings: {dataset.get_specimen_count()}')
-        # WEEK = 1
-        print(dataset.get_weekly_data(WEEK))        
-    
-        print("."*200)
+        if not device == Device.LOW_COST:
+            print(f'Device: {device.name}', f'Dataset length: {len(dataset)}',sep='\n')
+            print(f'Number of readings: {dataset.get_specimen_count()}')
+            # WEEK = 1
+            print(dataset.get_weekly_data(WEEK)) 
+            print(f'Number of uniques search labels: {len(dataset.get_weekly_data(WEEK)['search_label'])}')       
+        
+            print("."*200)
+            labels.append(dataset.labels)
+
+    # working with expert files
+    dataset = SpectralDataset_v2(DATA_PATH, device=Device.LOW_COST)
+    for file in dataset.expert_files:
+        # print(f'Expert file path: {file}')
+        if 'Maize' in file:
+            # print(f'Can call the maize expert file extractor on the following file {file}')
+            mln_df, msv_df = dataset._get_expert_file_MAIZE(file)
+            print(mln_df)
+            print('*'*100)
+            print(msv_df)
 
 
 
