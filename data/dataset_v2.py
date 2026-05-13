@@ -561,12 +561,11 @@ class SpectralDataset_v2(Dataset):
         """
         Cleans and formats beans expert readings
 
-        Args:
+        Arg:
             df_path-> str: path to where the expert file csv is stored
         
         Return:
             dataframe -> pd.Dataframe: with consistent column alignment with the other expert files
-        
         """
 
         beans_df = pd.read_excel(df_path)
@@ -576,7 +575,7 @@ class SpectralDataset_v2(Dataset):
         first_col = beans_df.columns[0]
         date_mask = beans_df[first_col].astype(str).str.match(r'^\s*\d{1,2}(st|nd|rd|th)?\s+[A-Za-z]+\s*$', case=False, na=False)
 
-        beans_df.iloc[date_mask, 'week'] = range(1, date_mask.sum() + 1) # create week numbers from detected dates
+        beans_df.loc[date_mask, 'week'] = range(1, date_mask.sum() + 1) # create week numbers from detected dates
         beans_df['week'] = beans_df['week'].ffill().fillna(0) # forward fill downwards and replace NaN with 0
         beans_df = beans_df[~date_mask].reset_index(drop=True) # remove date rows
 
@@ -619,7 +618,7 @@ class SpectralDataset_v2(Dataset):
         beans_df = beans_df.rename(columns=elisa_rename_keys)
 
         # reordering the columns for consistent merger
-        beans_df = beans_df[['plant_numer', 'score', 'titer_1', 'l_1', 'titer_2', 'l_2', 'titer_3', 'l_3', 'week', 'disease_class']]
+        beans_df = beans_df[['plant_number', 'score', 'titer_1', 'l_1', 'titer_2', 'l_2', 'titer_3', 'l_3', 'week', 'disease_class']]
         return beans_df
 
     
@@ -671,10 +670,9 @@ if __name__ == '__main__':
 
     # Testing the beans extraction pipeline
 
-
-    os.system('clear')
-    for file in dataset.expert_files:
-        print(file)
+    beans_path = 'spectral_data/ICAIN Disease data-Beans.xlsx'
+    beans_df = dataset._get_expert_file_BEANS(beans_path)
+    print(beans_df)
 
 
     
