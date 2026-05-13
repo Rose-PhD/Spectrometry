@@ -637,19 +637,11 @@ class SpectralDataset_v2(Dataset):
         for file in self.expert_files:
             if 'cassava' in file and '~' not in file:
                 cmd_df, cbb_df = self._get_expert_file_CASSAVA(file) # extract CMD and CBB files
-                expert_dfs.extend([cmd_df, cbb_df])
-                
+
                 if self.device == Device.LOW_COST:
                     # shift cmd_df to align with low_cost meta_data
                     cmd_df['plant_number'] = cmd_df['plant_number'] + self.CMD_SHIFT
-                    mask_7 = cmd_df['plant_number'] == 7
-                    mask_8 = cmd_df['plant_number'] == 8
-
-                    col = cmd_df.columns.difference(['plant_number']) # remove plant_number from cols to be swapped
-                    temp_7 = cmd_df.loc[mask_7, col].copy()           
-                    temp_8 = cmd_df.loc[mask_8, col].copy()           
-                    cmd_df.loc[mask_7, col] = temp_8.values          
-                    cmd_df.loc[mask_8, col] = temp_7.values           
+                             
 
                     # shift cbb_df to align with low cost meta_data
                     cbb_df['plant_number'] = cbb_df['plant_number'] + self.CBB_SHIFT
@@ -658,14 +650,15 @@ class SpectralDataset_v2(Dataset):
                     mask_5 = cbb_df['plant_number'] == 5
 
                     col = cbb_df.columns.difference(['plant_number']) # remove plant_number from cols to be swapped
-                    temp_3 = cbb_df[mask_3, col].copy()
-                    temp_4 = cbb_df[mask_4, col].copy()
-                    temp_5 = cbb_df[mask_5, col].copy()
+                    temp_3 = cbb_df.loc[mask_3, col].copy()
+                    temp_4 = cbb_df.loc[mask_4, col].copy()
+                    temp_5 = cbb_df.loc[mask_5, col].copy()
 
                     # Performing the column swaps
                     cbb_df.loc[mask_3, col] = temp_5.values
                     cbb_df.loc[mask_4, col] = temp_3.values
                     cbb_df.loc[mask_5, col] = temp_4.values
+                expert_dfs.extend([cmd_df, cbb_df])
 
 
             elif 'Maize' in file:
@@ -675,7 +668,6 @@ class SpectralDataset_v2(Dataset):
                     # Peform label alignment
                     mln_df['plant_number'] = mln_df['plant_number'] + self.MLN_SHIFT
                     msv_df['plant_number'] = msv_df['plant_number'] + self.MSV_SHIFT
-
                 expert_dfs.extend([mln_df, msv_df])
 
 
@@ -699,22 +691,23 @@ if __name__ == '__main__':
     import os 
     from data.dataset import Device
 
-    # investigate the population of data to the dataframe
-    dataset = SpectralDataset_v2(DATA_PATH, device=Device.LOW_COST)
-
-    # WEEK = int(input('Target week: '))
-    DISEASE_CLASS = input("Enter disease class: ")
+    
+    DISEASE_CLASS = (input('Enter disease class: ')).upper()
 
     os.system('clear')
 
-    # filtered_df = dataset.meta_data[(dataset.meta_data['week'] == WEEK) & (dataset.meta_data['disease_class'] == DISEASE_CLASS)]
-    filtered_df = dataset.meta_data[dataset.meta_data['disease_class'] == DISEASE_CLASS]
-    print(f'Disease class: {DISEASE_CLASS}', sep='\t| ')
-    print(filtered_df.head(50))
+    for device in Device.get_devices():
+        dataset = SpectralDataset_v2(DATA_PATH, device=device)
+        filtered_df = dataset.meta_data[dataset.meta_data['disease_class'] == DISEASE_CLASS]
+        print(f'{DISEASE_CLASS} DATASET FOR {(device.name)} DEVICE\n')
+        print(filtered_df)
+        print('*'*210)
 
-    # Testing the beans extraction pipeline
-    print(f'Labels')
-    print(dataset.labels)
+
+
+
+
+
 
    
 
