@@ -38,8 +38,15 @@ class SpectralDataset_v2(Dataset):
         self._load_fn()                                     # load states
         self.weeks = dict(sorted(self.weeks.items()))       # sort weeks 
         self._load_meta_data()
-        if self.device == Device.BIO_SCIENCE or self.device == Device.SCAN_CODER:
-            self.populate_expert_readings() 
+        if self.device == Device.LOW_COST:
+            self.MLN_SHIFT = 5                              # shift to align with 6-10 plant_numbers
+            self.MSV_SHIFT = 0                              # mantian 1-5 plant_number
+            self.CMD_SHIFT = 5                              # shift to align with 6-10 plant_numbers
+            self.CBB_SHIFT = 0                              # maintain 1-5 plant number
+        # if self.device == Device.BIO_SCIENCE or self.device == Device.SCAN_CODER:
+        #     self.populate_expert_readings() 
+        self.populate_expert_readings()
+        
 
 
     @staticmethod
@@ -631,9 +638,46 @@ class SpectralDataset_v2(Dataset):
             if 'cassava' in file and '~' not in file:
                 cmd_df, cbb_df = self._get_expert_file_CASSAVA(file) # extract CMD and CBB files
                 expert_dfs.extend([cmd_df, cbb_df])
+                
+                if self.device == Device.LOW_COST:
+                    # shift cmd_df to align with low_cost meta_data
+                    cmd_df['plant_number'] = cmd_df['plant_number'] + self.CMD_SHIFT
+                    mask_7 = cmd_df['plant_number'] == 7
+                    mask_8 = cmd_df['plant_number'] == 8
+
+                    col = cmd_df.columns.difference(['plant_number']) # remove plant_number from cols to be swapped
+                    temp_7 = cmd_df.loc[mask_7, col].copy()           
+                    temp_8 = cmd_df.loc[mask_8, col].copy()           
+                    cmd_df.loc[mask_7, col] = temp_8.values          
+                    cmd_df.loc[mask_8, col] = temp_7.values           
+
+                    # shift cbb_df to align with low cost meta_data
+                    cbb_df['plant_number'] = cbb_df['plant_number'] + self.CBB_SHIFT
+                    mask_3 = cbb_df['plant_number'] == 3
+                    mask_4 = cbb_df['plant_number'] == 4
+                    mask_5 = cbb_df['plant_number'] == 5
+
+                    col = cbb_df.columns.difference(['plant_number']) # remove plant_number from cols to be swapped
+                    temp_3 = cbb_df[mask_3, col].copy()
+                    temp_4 = cbb_df[mask_4, col].copy()
+                    temp_5 = cbb_df[mask_5, col].copy()
+
+                    # Performing the column swaps
+                    cbb_df.loc[mask_3, col] = temp_5.values
+                    cbb_df.loc[mask_4, col] = temp_3.values
+                    cbb_df.loc[mask_5, col] = temp_4.values
+
+
             elif 'Maize' in file:
                 mln_df, msv_df = self._get_expert_file_MAIZE(file)  # extract MLN, MSV files
+                
+                if self.device == Device.LOW_COST:
+                    # Peform label alignment
+                    mln_df['plant_number'] = mln_df['plant_number'] + self.MLN_SHIFT
+                    msv_df['plant_number'] = msv_df['plant_number'] + self.MSV_SHIFT
+
                 expert_dfs.extend([mln_df, msv_df])
+
 
         # merge the meta_data with expert readings
         merge_df = pd.concat(expert_dfs)
@@ -656,23 +700,25 @@ if __name__ == '__main__':
     from data.dataset import Device
 
     # investigate the population of data to the dataframe
-    dataset = SpectralDataset_v2(DATA_PATH, device=Device.BIO_SCIENCE)
+    dataset = SpectralDataset_v2(DATA_PATH, device=Device.LOW_COST)
 
-    # # WEEK = int(input('Target week: '))
-    # DISEASE_CLASS = input("Enter disease class: ")
+    # WEEK = int(input('Target week: '))
+    DISEASE_CLASS = input("Enter disease class: ")
 
-    # # os.system('clear')
+    os.system('clear')
 
-    # # filtered_df = dataset.meta_data[(dataset.meta_data['week'] == WEEK) & (dataset.meta_data['disease_class'] == DISEASE_CLASS)]
-    # filtered_df = dataset.meta_data[dataset.meta_data['disease_class'] == DISEASE_CLASS]
-    # print(f'Disease class: {DISEASE_CLASS}', sep='\t| ')
-    # print(filtered_df.head(50))
+    # filtered_df = dataset.meta_data[(dataset.meta_data['week'] == WEEK) & (dataset.meta_data['disease_class'] == DISEASE_CLASS)]
+    filtered_df = dataset.meta_data[dataset.meta_data['disease_class'] == DISEASE_CLASS]
+    print(f'Disease class: {DISEASE_CLASS}', sep='\t| ')
+    print(filtered_df.head(50))
 
     # Testing the beans extraction pipeline
+    print(f'Labels')
+    print(dataset.labels)
 
-    beans_path = 'spectral_data/ICAIN Disease data-Beans.xlsx'
-    beans_df = dataset._get_expert_file_BEANS(beans_path)
-    print(beans_df)
+   
+
+
 
 
     
