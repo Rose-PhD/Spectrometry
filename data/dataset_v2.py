@@ -1,6 +1,7 @@
 import os 
 from data.dataset import Device
 import pandas as pd
+import numpy as np
 import re
 from data.dataset import Dataset
 from typing import List, Tuple
@@ -31,16 +32,27 @@ class SpectralDataset_v2(Dataset):
         self.expert_files = list()                          # state for expert scores
         self.label_extra_week = label_extra_week
         self.meta_data = None                               # state for clean meta data
+                           
         
         
         self._load_fn()                                     # load states
         self.weeks = dict(sorted(self.weeks.items()))       # sort weeks 
         self._load_meta_data()
+        if self.device == Device.BIO_SCIENCE or self.device == Device.SCAN_CODER:
+            self.populate_expert_readings() 
 
 
     @staticmethod
-    def get_week(path):
-        """Extract the week from specimen data path"""
+    def get_week(path: str) -> None:
+        """
+        Extract the week from specimen data path
+
+        Args:
+            path -> str: path containing label from which the week is extracted
+        
+        Returns:
+            None
+        """
         match = re.search(r'week(\d+)', path.lower())
         if match:
             return int(match.group(1))
@@ -48,8 +60,13 @@ class SpectralDataset_v2(Dataset):
     
 
     @staticmethod
-    def extract_low_cost_label(path):
-        """Extracts labels for low cost device"""
+    def extract_low_cost_label(path: str) -> None:
+        """
+        Extracts labels for low cost device
+
+        Args:
+            path -> str: path to file system where low cost reading is stored
+        """
         label = path.split('/')[-2].replace('_', '').replace('scan', '')
         return label[:label.find('Ra')]
 
@@ -438,11 +455,13 @@ class SpectralDataset_v2(Dataset):
     
     def _get_expert_file_MAIZE(self, df_path: str):
         """
-        Cleans the expert files for MAIZE records
+        Cleans the expert files for MAIZE records and return MLN,  & MSV dataframes
+
         Args:
             df_path -> path to where expert files are stored
+
         Returns (Tuple):
-            MLV_df -> panda.DataFrame of MLN readings
+            ML  N_df -> panda.DataFrame of MLN readings
             MSV_df -> panda.DataFrame of MSV readins
         """
 
@@ -458,7 +477,7 @@ class SpectralDataset_v2(Dataset):
 
         # Create MLN split and populate meta data
         mln_df = maize_df.iloc[:, :split_idx+1]
-        mln_df['week'] = maize_df['week']
+        mln_df['week'] = maize_df['week'].astype('int64')
         mln_df['disease_class'] = 'MLN'
 
         # Create MSV df split and populate meta data
@@ -466,6 +485,7 @@ class SpectralDataset_v2(Dataset):
         msv_df['DAY'] = maize_df['DAY']
         msv_df['score'] = maize_df['score']
         msv_df['disease_class'] = 'MSV'
+        msv_df['week'] = msv_df['week'].astype('int64')
 
         # Rearrange the column position for msv_df to use shared renaming function
         msv_df = msv_df[['DAY', 'score', 'MSV1', 'Symptom description (A= asymptomatic, S=Symptom)', 'MLN2', 'Unnamed: 13', 'MLN3.1', 'Unnamed: 15', 'week', 'disease_class']]
@@ -494,6 +514,7 @@ class SpectralDataset_v2(Dataset):
         # extracting plant numbers only
         cmd_df['plant_number'] = cmd_df['plant_number'].astype(str).str.extract(r'(\d+)')[0].astype(int)
         cmd_df['week'] = cmd_df['week'].fillna(1)   # fill the first week of NaNs with 1
+        cmd_df['week'] = cmd_df['week'].astype('int64')  # convert week to int64 from obj type
         cmd_df['disease_class'] = 'CMD'             # fill in disease class
         return cmd_df
     
@@ -516,6 +537,7 @@ class SpectralDataset_v2(Dataset):
         cbb_df['plant_number'] = cbb_df['plant_number'].astype(str).str.extract(r'(\d+)')[0].astype(int)
         cbb_df['disease_class'] = 'CBB'                # fill disease class
         cbb_df = cbb_df.drop(columns=['description']) # drop description column to ensure consistency
+        cbb_df['week'] = cbb_df['week'].astype('int64')
         
         return cbb_df
     
@@ -534,7 +556,90 @@ class SpectralDataset_v2(Dataset):
         cbb_df = self._get_expert_files_CASSAVA_CBB(df_path)
         
         return (cmd_df, cbb_df)
+    
+    def _get_expert_file_BEANS(self, df_path:str) -> Tuple[pd.DataFrame]:
+        """
+        Cleans and formats beans expert readings
 
+        Args:
+            df_path-> str: path to where the expert file csv is stored
+        
+        Return:
+            dataframe -> pd.Dataframe: with consistent column alignment with the other expert files
+        
+        """
+
+        beans_df = pd.read_excel(df_path)
+        beans_df = beans_df.dropna(how='all').reset_index(drop=True) # drop rows with only NaNs
+        
+        # Annotate with appropriate week numbers
+        first_col = beans_df.columns[0]
+        date_mask = beans_df[first_col].astype(str).str.match(r'^\s*\d{1,2}(st|nd|rd|th)?\s+[A-Za-z]+\s*$', case=False, na=False)
+
+        beans_df.iloc[date_mask, 'week'] = range(1, date_mask.sum() + 1) # create week numbers from detected dates
+        beans_df['week'] = beans_df['week'].ffill().fillna(0) # forward fill downwards and replace NaN with 0
+        beans_df = beans_df[~date_mask].reset_index(drop=True) # remove date rows
+
+        # Ensure weekly data alignment i.e. starting from 1 not 0
+        beans_df['week'] = beans_df['week'] + 1
+
+        # Handle cases of missing plant_numbers following the sequeeze of 1..5
+        plant_col = 'Plant No'
+        last_value = None
+        for idx in beans_df.index:
+            current = beans_df.loc[idx, plant_col] 
+            # if current value exits, update tracker
+            if pd.notna(current):
+                last_value = int(current)
+            # if Nan, continue sequence
+            else:
+                if last_value is None:
+                    last_value = 1
+                else:
+                    last_value = (last_value % 5) + 1
+                
+                beans_df.loc[idx, plant_col] = last_value
+        
+        # drop empty columns
+        beans_df = beans_df.dropna(axis=1, how='all')
+        beans_df.columns = ['plant_number', 'disease_description', 'plant_1', 'plant_2', 'plant_3', 'elisa_score_1', 'elisa_score_2', 'elisa_score_3', 'week']
+        beans_df = beans_df.drop(columns=['disease_description'])
+
+        # compute score as mean of plant_* in df
+        cols_to_average= [f'plant_{i+1}' for i in range(3)]
+        beans_df['score'] = beans_df[cols_to_average].mean(axis=1).astype(int)
+        beans_df = beans_df.drop(columns=cols_to_average) # drop plant columns
+
+        # making l_* columns to ensure consistency with other expert reading files
+        beans_df['l_1'], beans_df['l_2'], beans_df['l_3'] = (np.nan for _ in range(3))
+        beans_df['disease_class'] = np.nan # disease_class to be updated
+
+        # renaming colums
+        elisa_rename_keys = {f'elisa_score_{i+1}': f'titer_{i+1}' for i in range(3)}
+        beans_df = beans_df.rename(columns=elisa_rename_keys)
+
+        # reordering the columns for consistent merger
+        beans_df = beans_df[['plant_numer', 'score', 'titer_1', 'l_1', 'titer_2', 'l_2', 'titer_3', 'l_3', 'week', 'disease_class']]
+        return beans_df
+
+    
+    def populate_expert_readings(self) -> None:
+        """
+        Wrapper function, loads all expert files and merges them with the meta data file
+        """
+        expert_dfs = []
+        for file in self.expert_files:
+            if 'cassava' in file and '~' not in file:
+                cmd_df, cbb_df = self._get_expert_file_CASSAVA(file) # extract CMD and CBB files
+                expert_dfs.extend([cmd_df, cbb_df])
+            elif 'Maize' in file:
+                mln_df, msv_df = self._get_expert_file_MAIZE(file)  # extract MLN, MSV files
+                expert_dfs.extend([mln_df, msv_df])
+
+        # merge the meta_data with expert readings
+        merge_df = pd.concat(expert_dfs)
+        self.meta_data = pd.merge(self.meta_data, merge_df, how='left')  
+ 
 
     def get_weekly_data(self, week: int):
         """Returns data for a specific week"""
@@ -551,41 +656,39 @@ if __name__ == '__main__':
     import os 
     from data.dataset import Device
 
-    week = input('Enter week to consider: ')
-    WEEK = int(week)
-    labels = []
+    # investigate the population of data to the dataframe
+    dataset = SpectralDataset_v2(DATA_PATH, device=Device.BIO_SCIENCE)
+
+    # # WEEK = int(input('Target week: '))
+    # DISEASE_CLASS = input("Enter disease class: ")
+
+    # # os.system('clear')
+
+    # # filtered_df = dataset.meta_data[(dataset.meta_data['week'] == WEEK) & (dataset.meta_data['disease_class'] == DISEASE_CLASS)]
+    # filtered_df = dataset.meta_data[dataset.meta_data['disease_class'] == DISEASE_CLASS]
+    # print(f'Disease class: {DISEASE_CLASS}', sep='\t| ')
+    # print(filtered_df.head(50))
+
+    # Testing the beans extraction pipeline
+
 
     os.system('clear')
-    for device in Device.get_devices():
-        dataset = SpectralDataset_v2(DATA_PATH, device=device)
-        if not device == Device.LOW_COST:
-            print(f'Device: {device.name}', f'Dataset length: {len(dataset)}',sep='\n')
-            print(f'Number of readings: {dataset.get_specimen_count()}')
-            # WEEK = 1
-            print(dataset.get_weekly_data(WEEK)) 
-            print(f'Number of uniques search labels: {len(dataset.get_weekly_data(WEEK)['search_label'])}')       
-        
-            print("."*200)
-            labels.append(dataset.labels)
-
-    # working with expert files
-    dataset = SpectralDataset_v2(DATA_PATH, device=Device.LOW_COST)
     for file in dataset.expert_files:
-        # print(f'Expert file path: {file}')
-        if 'Maize' in file:
-            # print(f'Can call the maize expert file extractor on the following file {file}')
-            mln_df, msv_df = dataset._get_expert_file_MAIZE(file)
-            print(mln_df)
-            print('*'*100)
-            print(msv_df)
-            print('*'*100)
-        elif 'cassava' in file and '~' not in file:
-            print(file)
-            cmd_df, cbb_df = dataset._get_expert_file_CASSAVA(file)
-            print(cmd_df)
-            print('*'*100)
-            print(cbb_df)
-            print('*'*100)
+        print(file)
+
+
+    
+
+    
+
+
+
+
+
+
+
+
+
         
 
 
