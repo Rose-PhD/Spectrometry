@@ -618,7 +618,7 @@ class SpectralDataset_v2(Dataset):
 
         # making l_* columns to ensure consistency with other expert reading files
         beans_df['l_1'], beans_df['l_2'], beans_df['l_3'] = (np.nan for _ in range(3))
-        beans_df['disease_class'] = np.nan # disease_class to be updated
+        beans_df['disease_class'] = 'BLB' # disease_class to be updated
 
         # renaming colums
         elisa_rename_keys = {f'elisa_score_{i+1}': f'titer_{i+1}' for i in range(3)}
@@ -669,6 +669,9 @@ class SpectralDataset_v2(Dataset):
                     mln_df['plant_number'] = mln_df['plant_number'] + self.MLN_SHIFT
                     msv_df['plant_number'] = msv_df['plant_number'] + self.MSV_SHIFT
                 expert_dfs.extend([mln_df, msv_df])
+            elif 'Beans' in file:
+                blb_df = self._get_expert_file_BEANS(file)
+                expert_dfs.append(blb_df)
 
 
         # merge the meta_data with expert readings
@@ -700,11 +703,10 @@ if __name__ == '__main__':
         dataset = SpectralDataset_v2(DATA_PATH, device=device)
         filtered_df = dataset.meta_data[dataset.meta_data['disease_class'] == DISEASE_CLASS]
         print(f'{DISEASE_CLASS} DATASET FOR {(device.name)} DEVICE\n')
-        print(filtered_df)
+        print(filtered_df.head(50))
         print('*'*210)
 
-
-
+    
 
 
 
