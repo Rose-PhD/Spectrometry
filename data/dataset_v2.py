@@ -688,7 +688,52 @@ class SpectralDataset_v2(Dataset):
     def __getitem__(self):
         """Extracts a single item to be batched"""
         pass
+
+
+class SpectralDataset(SpectralDataset_v2):
+    """
+    Incoporates images in dataframes created from devices without images e.g. SCAN_CORDER, BIO_SCIENCE. Low cost is not changed
     
+    """
+   
+    def __init__(self, data_path: str, device: Device, label_extra_week: int=9):
+        """
+        Args:
+            data_path-> str: path to where data is stored
+            device -> Device: whose data should be loaded
+            label_extra_week: int -> week to consider when loading labels, i.e. should be complete
+        """
+        super().__init__(data_path, device, label_extra_week)
+
+        # Handle distribution if the device is not low cost
+        if not device == Device.LOW_COST:
+            dataset_lc = SpectralDataset_v2(data_path, device=Device.LOW_COST)
+            images_df = dataset_lc.loc[:,  ['week', 'plant_type', 'plant_number', 'disease_class', 'img_count', 'img_data_dirs']]
+            
+            # apply mapping shifts for alignment
+            mapping = {
+                ('C', 'CMD'): 5,
+                ('C', 'CBB'): 0,
+                ('C', 'HLT'): 10,
+                ('M', 'MLN'): 5,
+                ('M', 'MSV'): 0,
+                ('M', 'HLT'): 10,
+                ('B', 'BLB'): 0,
+                ('B', 'BRD'): 0,
+                ('B', 'HLT'): 0,
+            }
+
+            for (plant_c, disease), shift in mapping.items():
+                mask = (
+                    (images_df['plant_types'] == plant_c) &
+                    (images_df['disease_class'] == disease)
+                )
+                images_df.loc[mask, 'plant_number'] -= shift
+
+            # perform merging
+            self.meta_data = self.meta_data.merge(images_df, how='left')
+            
+
         
 if __name__ == '__main__':
     import os 
@@ -704,13 +749,31 @@ if __name__ == '__main__':
 
     images_df = meta_data_LC.loc[:, ['week', 'plant_type','plant_number', 'disease_class', 'img_count', 'img_data_dirs']]
 
+    # compute mapping 
+    mapping = {
+    ('C', 'CMD'): 5,
+    ('C', 'CBB'): 0,
+    ('C', 'HLT'): 10,
+    ('M', 'MLN'): 5,
+    ('M', 'MSV'): 0,
+    ('M', 'HLT'): 10,
+    ('B', 'BLB'): 0,
+    ('B', 'BRD'): 0,
+    ('B', 'HLT'): 0,
+}
 
-    # Computing the shifts
-    plant_types = ['C', 'M', 'B']
-    disease_types = ['CMD', 'CBB', '']
+    for (plant_c, disease), shift in mapping.items():
+
+        mask = (
+            (images_df['plant_type'] == plant_c) &
+            (images_df['disease_class'] == disease) 
+        )
+
+        images_df.loc[mask, 'plant_number'] -= shift
+
     
-    DISASES_CLASS = 'BRD'
-    PLANT_TYPE = 'B'
+    DISASES_CLASS = 'HLT'
+    PLANT_TYPE = 'M'
     WEEK = int(input('Enter week: '))
 
     filtered_1 = images_df[(images_df['disease_class'] == DISASES_CLASS) & (images_df['week'] == WEEK) & (images_df['plant_type'] == PLANT_TYPE)]
