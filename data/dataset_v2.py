@@ -694,17 +694,31 @@ if __name__ == '__main__':
     import os 
     from data.dataset import Device
 
+    # Attempting Image Merger
+    dataset_BIO = SpectralDataset_v2(DATA_PATH, Device.BIO_SCIENCE)
+    dataset_LC = SpectralDataset_v2(DATA_PATH, Device.LOW_COST)
+
+    meta_data_BIO = dataset_BIO.meta_data
+    meta_data_LC = dataset_LC.meta_data
+
+
+    images_df = meta_data_LC.loc[:, ['week', 'plant_type','plant_number', 'disease_class', 'img_count', 'img_data_dirs']]
+
+
+    # Computing the shifts
+    plant_types = ['C', 'M', 'B']
+    disease_types = ['CMD', 'CBB', '']
     
-    DISEASE_CLASS = (input('Enter disease class: ')).upper()
+    DISASES_CLASS = 'BRD'
+    PLANT_TYPE = 'B'
+    WEEK = int(input('Enter week: '))
 
-    os.system('clear')
+    filtered_1 = images_df[(images_df['disease_class'] == DISASES_CLASS) & (images_df['week'] == WEEK) & (images_df['plant_type'] == PLANT_TYPE)]
+    filtered_2 = meta_data_BIO[(meta_data_BIO['disease_class'] == DISASES_CLASS) & (meta_data_BIO['week'] == WEEK) & (meta_data_BIO['plant_type'] == PLANT_TYPE)]
 
-    for device in Device.get_devices():
-        dataset = SpectralDataset_v2(DATA_PATH, device=device)
-        filtered_df = dataset.meta_data[dataset.meta_data['disease_class'] == DISEASE_CLASS]
-        print(f'{DISEASE_CLASS} DATASET FOR {(device.name)} DEVICE\n')
-        print(filtered_df.head(50))
-        print('*'*210)
+    print(f'IMAGE FILES FROM THE LOW COST DEVICE',filtered_1.head(50), sep='\n')
+    print(f'DATA FROM BIO SCIENCE META DATA', filtered_2.head(50), sep='\n')
+
 
     
 
