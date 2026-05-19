@@ -725,11 +725,11 @@ class SpectralDataset_v2(Dataset):
     
 
     @staticmethod
-    def read_one_BIOSCIENCE(path: str) -> List[pd.DataFrame]:
+    def read_single_BIOSCIENCE(path: str) -> List[pd.DataFrame]:
         """
         Reads Raw data, peak wavelength information, and calibration for BIO_SCIENCE
 
-        Args:
+        Arg:
             path: str -> path of file to read
         
         Returns:
@@ -769,7 +769,7 @@ class SpectralDataset_v2(Dataset):
         # Percentage dropping function
         drop_prec = lambda s: re.sub(r"[%'']", "", s)
         to_array = lambda s: np.array(ast.literal_eval(f"[{s}]"))
-        to_b_array = lambda S: np.array([to_array(drop_prec(s)) for s in S])
+        to_b_array = lambda S: np.array([to_array(drop_prec(s)) for s in S]).astype(np.float32)
 
         def make_compartible(index) -> pd.DataFrame:
             """
@@ -787,6 +787,44 @@ class SpectralDataset_v2(Dataset):
         CALIBRATION_INDEX = -1
 
         return make_compartible(RAW_SPECTRA_INDEX), make_compartible(PEAK_VALUES_INDEX), make_compartible(CALIBRATION_INDEX) 
+    
+    def read_one_BIOSCIENCE(self, index) -> iter:
+        """
+        Yields the spectra data files for the indexed object
+
+        Arg:
+            index -> position to tagert file
+        """
+        for file in self.meta_data.loc[index, 'specimen_data_dirs']:
+            yield self.read_single_BIOSCIENCE(file)
+
+
+    def read_one_SCAN_CODER(self, index: int) -> iter:
+        """
+        Yields the specimen files for the indexed file
+
+        Arg:
+            index: int -> position to the target file
+        """
+        for file in self.meta_data.loc[index, 'specimen_reading']:
+            yield np.array(file, dtype=np.float32)
+    
+
+    def read_one(self, index: int):
+        """
+        Wrapper function that yields the specimen file for the indexed file
+
+        Arg:
+            index: int -> position to the target if
+        """
+        if self.device == Device.BIO_SCIENCE:
+            return self.read_one_BIOSCIENCE(index)
+        
+        else:
+            return self.read_one_SCAN_CODER(index)
+        
+    
+
 
 
 
