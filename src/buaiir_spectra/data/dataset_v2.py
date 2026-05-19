@@ -808,7 +808,56 @@ class SpectralDataset_v2(Dataset):
         """
         for file in self.meta_data.loc[index, 'specimen_reading']:
             yield np.array(file, dtype=np.float32)
+
+
+    @staticmethod
+    def read_single_LOW_COST(path: str) -> Tuple[np.ndarray]:
+        """
+        Reads raw files 1 & 2, band energy files 1 & 2 files of LOW COST device
+
+        Arg:
+            path: str -> directory to file location
+        
+        Returns:
+            spectral_1: np.ndarray-> spectral reading 1
+            spectral_2: np.ndarray -> spectral reading 2
+            band_energy_1: np.ndarray -> band energy computed from spectral reading 1
+            band_energy_2: np.ndarray -> band energy computed from spectral reading 2
+        """
+        df0 = pd.read_csv(path)
+        spectral_1 = ast.literal_eval(df0['spectral_1'][0])
+
+        if isinstance(spectral_1, dict):
+            spectral_2 = ast.literal_eval(df0['spectral_2'])
+            band_energy_1 = spectral_1['bandEnergy']
+            band_energy_2 = spectral_2['bandEnergy']
+            spectral_1 = spectral_1['intensity']
+            spectral_2 = spectral_2['intensity']
+        else:
+            spectral_2 = ast.literal_eval(df0['spectral_2'][0])
+            band_energy_1 = ast.literal_eval(df0['band_energy_spectral_1'][0])
+            band_energy_2 = ast.literal_eval(df0['band_energy_spectral_2'][0])
+        
+        return (
+            np.array(spectral_1, dtype=np.float32), 
+            np.array(spectral_2, dtype=np.float32), 
+            np.array(band_energy_1, dtype=np.float32),
+            np.array(band_energy_2, dtype=np.float32)
+        )
     
+    def read_one_LOW_COST(self, index: int) -> iter:
+        """
+        Yields the spectral dataset for the indexed object
+
+        Arg:
+            index: int -> position to target file to be loaded
+        
+        Returns:
+            iter -> Iterator that yield the spectral files
+        """
+        for file in self.meta_data.loc[index, 'specimen_data_dirs']:
+            yield self.read_single_LOW_COST(file)
+            
 
     def read_one(self, index: int):
         """
@@ -820,13 +869,12 @@ class SpectralDataset_v2(Dataset):
         if self.device == Device.BIO_SCIENCE:
             return self.read_one_BIOSCIENCE(index)
         
+        elif self.device == Device.LOW_COST:
+            return self.read_one_LOW_COST(index)
+        
         else:
             return self.read_one_SCAN_CODER(index)
         
-    
-
-
-
 
 
 class SpectralDataset(SpectralDataset_v2):
@@ -872,7 +920,6 @@ class SpectralDataset(SpectralDataset_v2):
             # perform merging
             self.meta_data = self.meta_data.merge(images_df, how='left')
             
-
 
 
 if __name__ == '__main__':
