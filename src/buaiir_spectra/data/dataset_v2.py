@@ -1,11 +1,13 @@
 import os 
 import pandas as pd
 import numpy as np
+import ast
 from pathlib import Path
 import re
 from buaiir_spectra.data.dataset import Dataset
 from buaiir_spectra.utils.device import Device
 from typing import List, Tuple
+
 
 
 class SpectralDataset_v2(Dataset):
@@ -720,6 +722,72 @@ class SpectralDataset_v2(Dataset):
             data_obj: pd.Series -> meta data for the indexed record
         """
         return self.meta_data.loc[index]
+    
+
+    @staticmethod
+    def read_one_BIOSCIENCE(path: str) -> List[pd.DataFrame]:
+        """
+        Reads Raw data, peak wavelength information, and calibration for BIO_SCIENCE
+
+        Args:
+            path: str -> path of file to read
+        
+        Returns:
+            RAW_DATA_FILE: pd.DataFrame -> Contains the raw spectral readings
+            PEAK_WAVELENGTH_FILE: pd.DataFrame -> Contains the peak wavelength
+            CALIBRATION_FILE: pd.DataFrame -> Contains calibration data
+        """
+
+        # Data Containers
+        headers = []
+        interval_state = []
+        global_state = []
+
+        # Pattern matching
+        number_pattern = re.compile(r"^\s*-?\d+(\.\d+)?([eE]-?\d+)?%?\s*$")
+
+        # Determine if Numeric or Non numeric
+        def _is_numeric_row(line):
+            
+            parts = line.split(",")
+            return all(number_pattern.match(p) for p in parts)
+
+
+        with open(path, 'r') as f:
+            for line in f:
+                line = line.strip("\n")
+                if line == '':
+                    # update global state and reset interval data
+                    global_state.append(interval_state)
+                    interval_state = []
+                    continue
+                if not _is_numeric_row(line):
+                    headers.append(line)
+                    continue
+                interval_state.append(line)
+
+        # Percentage dropping function
+        drop_prec = lambda s: re.sub(r"[%'']", "", s)
+        to_array = lambda s: np.array(ast.literal_eval(f"[{s}]"))
+        to_b_array = lambda S: np.array([to_array(drop_prec(s)) for s in S])
+
+        def make_compartible(index) -> pd.DataFrame:
+            """
+            Organizes the data into a dataframe match readable to the user
+            """
+            array = to_b_array(global_state[index])
+            cols = headers[index].split(',')
+
+            return pd.DataFrame(data=array, columns=cols)
+        
+        
+        # Reference index
+        RAW_SPECTRA_INDEX = -3
+        PEAK_VALUES_INDEX = -2
+        CALIBRATION_INDEX = -1
+
+        return make_compartible(RAW_SPECTRA_INDEX), make_compartible(PEAK_VALUES_INDEX), make_compartible(CALIBRATION_INDEX) 
+
 
 
 
