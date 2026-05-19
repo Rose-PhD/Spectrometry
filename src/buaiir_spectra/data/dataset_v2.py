@@ -47,6 +47,8 @@ class SpectralDataset_v2(Dataset):
         
         # Load expert states after alignment                             
         self.populate_expert_readings()
+        self.create_disease_embeddings()
+        self.create_plant_embeddings()
 
     
     @staticmethod
@@ -709,19 +711,6 @@ class SpectralDataset_v2(Dataset):
     def get_weekly_data(self, week: int):
         """Returns data for a specific week"""
         return self.meta_data[self.meta_data['week'] == week]
-
-    
-    def __getitem__(self, index: int) -> pd.Series:
-        """
-        Extracts the meta data of a single readings
-
-        Args:
-            index: int -> index of record to be read
-
-        Returns:
-            data_obj: pd.Series -> meta data for the indexed record
-        """
-        return self.meta_data.loc[index]
     
 
     @staticmethod
@@ -875,7 +864,113 @@ class SpectralDataset_v2(Dataset):
         else:
             return self.read_one_SCAN_CODER(index)
         
+    def create_disease_embeddings(self):
+        """
+        Computes the embedding for the disease classes
 
+        """
+        disease_classes = sorted(self.meta_data['disease_class'].unique())
+        disease_classes.remove('HLT')
+
+        # Force HLT to be embedded as one
+        final_class = ['HLT']
+        final_class.extend(disease_classes)
+
+        self.disease_class_codes = {d : i for i, d in enumerate(final_class)}
+
+    def create_plant_embeddings(self):
+        """
+        Computes the embeddings for the plants in the dataset
+    
+        """
+        plant_types = sorted(self.meta_data['plant_type'].unique())
+        self.plant_type_codes = {c: i for i, c in enumerate(plant_types)}
+
+    
+    def __getitem__(self, index: int) -> pd.Series:
+        """
+        Extracts the meta data of a single readings
+
+        Args:
+            index: int -> index of record to be read
+
+        Returns:
+            data_obj: pd.Series -> meta data for the indexed record
+        """
+        # Repulicate titer, week, disease, class, and expert score for the n readings
+        # columns drops l_1, l_2, l_3, img_count, 
+        # target vector titer_readings
+        # feature vector: raw_reading(7), week, plant_type
+
+        n_data = self.meta_data.loc[index, 'raw_count']
+        out_dim = None
+        n_tiles = 1
+
+        if self.device == Device.BIO_SCIENCE:
+            spectral_range_size = 3648
+            peak_wavelength_size = 0 # Peak wavelength are inconsistent
+            out_dim = spectral_range_size + peak_wavelength_size
+        
+        elif self.device == Device.SCAN_CODER:
+            spectral_range_size = 12
+            out_dim = spectral_range_size
+        else:
+            spectral_range_size = 381
+            band_energy = 6
+            out_dim = spectral_range_size + band_energy
+            n_tiles += 1
+
+        # Targe features
+        N_titer_readings = 3
+        Disease_class_size = 1
+        week_size = 1
+        expert_score_size = 1
+
+        # Create Buffer arrays
+        if self.device == Device.LOW_COST:
+            # add a channel Dimension to x_out
+            N_samples = 2
+            x_out = np.zeros((n_data, N_samples, out_dim))
+        else:
+            x_out = np.zeros((n_data, out_dim))
+
+        y_out = np.zeros(N_titer_readings + Disease_class_size + week_size + expert_score_size)
+
+        # Fill in the target data
+        target_cols = [f'titer_{i}' for i in range(1, 4)]
+        target_cols.extend(['score', 'week', 'disease_class'])
+        n_cols = len(target_cols)
+
+        for i in range(n_cols):
+            if i == n_cols - 1:
+                y_out[i] = self.disease_class_codes[self.meta_data.loc[index, target_cols[i]]]
+            else:
+                y_out[i] = self.meta_data.loc[index, target_cols[i]]
+
+        if self.device == Device.LOW_COST:
+            y_out = np.tile(y_out, (2, n_data, 1))
+        
+        else:
+            y_out = np.tile(y_out, (n_data , 1))
+    
+
+        # Iterate over single data loader and batch the data
+        for i, file in enumerate(self.read_one(index)):
+            if self.device == Device.SCAN_CODER:
+                x_out[i, :] = file
+            elif self.device == Device.LOW_COST:
+                spectral_1, spectra_2, band_energy_1, band_energy_2 = file
+                x_out[i, 0, :spectral_range_size] = spectral_1
+                x_out[i, 0, spectral_range_size:] = band_energy_1
+                x_out[i, 1, :spectral_range_size] = spectra_2
+                x_out[i, 1, spectral_range_size:] = band_energy_2
+            
+            else:
+                raw_data, _ , _ = file # calibration data not required for -> _
+                x_out[i, :spectral_range_size] = raw_data[raw_data.columns[-1]].values
+                
+        return x_out, y_out
+    
 
 class SpectralDataset(SpectralDataset_v2):
     """
