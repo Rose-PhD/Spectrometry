@@ -708,7 +708,7 @@ class SpectralDataset(SpectralDataset_v2):
         # Handle distribution if the device is not low cost
         if not device == Device.LOW_COST:
             dataset_lc = SpectralDataset_v2(data_path, device=Device.LOW_COST)
-            images_df = dataset_lc.loc[:,  ['week', 'plant_type', 'plant_number', 'disease_class', 'img_count', 'img_data_dirs']]
+            images_df = dataset_lc.meta_data.loc[:,  ['week', 'plant_type', 'plant_number', 'disease_class', 'img_count', 'img_data_dirs']]
             
             # apply mapping shifts for alignment
             mapping = {
@@ -725,7 +725,7 @@ class SpectralDataset(SpectralDataset_v2):
 
             for (plant_c, disease), shift in mapping.items():
                 mask = (
-                    (images_df['plant_types'] == plant_c) &
+                    (images_df['plant_type'] == plant_c) &
                     (images_df['disease_class'] == disease)
                 )
                 images_df.loc[mask, 'plant_number'] -= shift
@@ -739,48 +739,18 @@ if __name__ == '__main__':
     import os 
     from data.dataset import Device
 
-    # Attempting Image Merger
-    dataset_BIO = SpectralDataset_v2(DATA_PATH, Device.BIO_SCIENCE)
-    dataset_LC = SpectralDataset_v2(DATA_PATH, Device.LOW_COST)
-
-    meta_data_BIO = dataset_BIO.meta_data
-    meta_data_LC = dataset_LC.meta_data
 
 
-    images_df = meta_data_LC.loc[:, ['week', 'plant_type','plant_number', 'disease_class', 'img_count', 'img_data_dirs']]
+    dataset = SpectralDataset(DATA_PATH, device=Device.LOW_COST)
+        
+    DISEASE_CLASS = 'MLN'
+    filtered = dataset.meta_data[dataset.meta_data['disease_class'] == DISEASE_CLASS]
 
-    # compute mapping 
-    mapping = {
-    ('C', 'CMD'): 5,
-    ('C', 'CBB'): 0,
-    ('C', 'HLT'): 10,
-    ('M', 'MLN'): 5,
-    ('M', 'MSV'): 0,
-    ('M', 'HLT'): 10,
-    ('B', 'BLB'): 0,
-    ('B', 'BRD'): 0,
-    ('B', 'HLT'): 0,
-}
+    print(filtered)
 
-    for (plant_c, disease), shift in mapping.items():
 
-        mask = (
-            (images_df['plant_type'] == plant_c) &
-            (images_df['disease_class'] == disease) 
-        )
 
-        images_df.loc[mask, 'plant_number'] -= shift
 
-    
-    DISASES_CLASS = 'HLT'
-    PLANT_TYPE = 'M'
-    WEEK = int(input('Enter week: '))
-
-    filtered_1 = images_df[(images_df['disease_class'] == DISASES_CLASS) & (images_df['week'] == WEEK) & (images_df['plant_type'] == PLANT_TYPE)]
-    filtered_2 = meta_data_BIO[(meta_data_BIO['disease_class'] == DISASES_CLASS) & (meta_data_BIO['week'] == WEEK) & (meta_data_BIO['plant_type'] == PLANT_TYPE)]
-
-    print(f'IMAGE FILES FROM THE LOW COST DEVICE',filtered_1.head(50), sep='\n')
-    print(f'DATA FROM BIO SCIENCE META DATA', filtered_2.head(50), sep='\n')
 
 
     
