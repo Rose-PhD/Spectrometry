@@ -5,27 +5,12 @@ from pathlib import Path
 import pandas as pd 
 import numpy as np
 import ast
+from buaiir_spectra.utils.device import Device
 
 
 data_path = Path("spectral_data")
 WEEK_NAME_INDEX = -1
 WEEK_NO_INDEX = -5
-
-
-class Device(Enum):
-    BIO_SCIENCE = 0
-    SCAN_CODER = 1
-    LOW_COST = 2
-
-    @classmethod
-    def get_devices(cls):
-        """Returns the names of the devices in the enum"""
-        return list(cls)
-    
-    @classmethod
-    def get_device_names(cls):
-        return [device.name for device in cls]
-
 
 
 class FileFormats(Enum):

@@ -1,22 +1,15 @@
 import os 
-from data.dataset import Device
 import pandas as pd
 import numpy as np
+from pathlib import Path
 import re
-from data.dataset import Dataset
+from buaiir_spectra.data.dataset import Dataset
+from buaiir_spectra.utils.device import Device
 from typing import List, Tuple
 
-DATA_PATH = 'spectral_data' 
-
-"""
-TODO:
-    Merging the chemical reading data with device meta data
-    Ensure consistent merging with Low-cost device
-    Redistribute the images to each device
-"""
 
 class SpectralDataset_v2(Dataset):
-    def __init__(self, data_path, device: Device, label_extra_week: int= 9):
+    def __init__(self, data_path, device: Device, label_extra_week: int= 9) -> None:
         """
         Class wrapper for loading spectral data for specific device
 
@@ -25,27 +18,57 @@ class SpectralDataset_v2(Dataset):
             device: target device whose data is required
             label_extra_week: week to consider will loading sample labels
         """
+        # Dataset configurations                              
         self.data_path = data_path
-        self.device = device                                # target device for data being loaded
-        self.labels = None                                  # labels for selection
-        self.weeks = dict()                                 # dict of labels and files
-        self.expert_files = list()                          # state for expert scores
+        self.device = device
         self.label_extra_week = label_extra_week
-        self.meta_data = None                               # state for clean meta data
-                           
         
+        # Lables & meta data                                
+        self.labels = None  
+        self.meta_data = None
+
+        # Data containers                                
+        self.weeks = dict()                                 
+        self.expert_files = list()                         
         
-        self._load_fn()                                     # load states
-        self.weeks = dict(sorted(self.weeks.items()))       # sort weeks 
+        # Load states
+        self._load_fn()                                     
+        self.weeks = dict(sorted(self.weeks.items()))        
         self._load_meta_data()
+
+        # Data alignment Configurations
         if self.device == Device.LOW_COST:
-            self.MLN_SHIFT = 5                              # shift to align with 6-10 plant_numbers
-            self.MSV_SHIFT = 0                              # mantian 1-5 plant_number
-            self.CMD_SHIFT = 5                              # shift to align with 6-10 plant_numbers
-            self.CBB_SHIFT = 0                              # maintain 1-5 plant number
-        # if self.device == Device.BIO_SCIENCE or self.device == Device.SCAN_CODER:
-        #     self.populate_expert_readings() 
+            self.MLN_SHIFT = 5                              
+            self.MSV_SHIFT = 0                              
+            self.CMD_SHIFT = 5                              
+            self.CBB_SHIFT = 0 
+        
+        # Load expert states after alignment                             
         self.populate_expert_readings()
+
+    
+    @staticmethod
+    def _normalize_to_spectra_data(path: str, root_name:str = "spectra_data") -> str:
+        """
+        Extracts new path from idx of spectra_data 
+
+        Args:
+            path:str -> directory where data is store or downloaded to 
+            root_name: str -> key to search for in the given path
+
+        Return:
+            new_path: str -> updated path 
+        """
+        path = Path(path).resolve()
+        parts = path.parts
+
+        # check for root name
+        if root_name not in parts:
+            raise ValueError(f'{root_name} not found in path')
+        
+        idx = parts.index(root_name)
+        new_path = Path(*parts[idx:])
+        return new_path
         
 
 
@@ -318,7 +341,9 @@ class SpectralDataset_v2(Dataset):
                 # extract the sort keys and disease_category
                 plant_type, plant_number = self._generate_sort_key_LOW_COST(label)
                 specimen_data_dir = values['specimen_data_dirs']
-                disease_cat = specimen_data_dir[0].split('/')[5]
+
+                disease_cat = specimen_data_dir[0].split('/')[-3]
+
 
                 rows.append({
                     'week': week,
@@ -682,17 +707,25 @@ class SpectralDataset_v2(Dataset):
     def get_weekly_data(self, week: int):
         """Returns data for a specific week"""
         return self.meta_data[self.meta_data['week'] == week]
-    
 
     
-    def __getitem__(self):
-        """Extracts a single item to be batched"""
-        pass
+    def __getitem__(self, index: int) -> pd.Series:
+        """
+        Extracts the meta data of a single readings
+
+        Args:
+            index: int -> index of record to be read
+
+        Returns:
+            data_obj: pd.Series -> meta data for the indexed record
+        """
+        return self.meta_data.loc[index]
+
 
 
 class SpectralDataset(SpectralDataset_v2):
     """
-    Incoporates images in dataframes created from devices without images e.g. SCAN_CORDER, BIO_SCIENCE. Low cost is not changed
+    Class wrapper that loads spectra data of the specified device, current supporting BIO_SCIENCE, SCAN_CODER, LOW_COST 
     
     """
    
@@ -734,22 +767,18 @@ class SpectralDataset(SpectralDataset_v2):
             self.meta_data = self.meta_data.merge(images_df, how='left')
             
 
-        
+
+
 if __name__ == '__main__':
-    import os 
-    from data.dataset import Device
+    from buaiir_spectra.utils.device import Device
+    from buaiir_spectra.data.dataset_v2 import SpectralDataset
 
+    data_path = '/home/wilfred/Datasets/spectra_data'
+    dataset = SpectralDataset(data_path, Device.LOW_COST)
 
-
-    dataset = SpectralDataset(DATA_PATH, device=Device.LOW_COST)
-        
-    DISEASE_CLASS = 'MLN'
-    filtered = dataset.meta_data[dataset.meta_data['disease_class'] == DISEASE_CLASS]
-
+    DISEASE_CLASS= 'CMD'
+    filtered = dataset.meta_data[dataset.meta_data['disease_class'] ==DISEASE_CLASS]
     print(filtered)
-
-
-
 
 
 

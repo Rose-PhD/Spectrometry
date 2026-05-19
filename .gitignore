@@ -5,3 +5,4 @@ spectral_data
 __pycache__
 *.egg-info
 *.csv
+notebooks
