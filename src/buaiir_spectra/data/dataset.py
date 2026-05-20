@@ -4,9 +4,13 @@ import numpy as np
 import ast
 from pathlib import Path
 import re
-from buaiir_spectra.utils.device import Device
 from typing import List, Tuple
 from abc import ABC, abstractmethod
+from buaiir_spectra.utils.device import Device
+from buaiir_spectra.utils.config_args import ConfigArgs
+
+
+
 
 class Dataset(ABC):
     """
@@ -985,14 +989,11 @@ class SpectralDataset(SpectralDataset_v2):
     
     """
    
-    def __init__(self, data_path: str, device: Device, t_week:int = None, t_disease_class: str= None, t_plant_type: str= None, label_extra_week: int=9):
+    def __init__(self, data_path: str, device: Device, label_extra_week: int=9):
         """
         Arg:
             data_path-> str: path to where data is stored
             device -> Device: whose data should be loaded
-            t_week: int -> desired week to be loaded
-            t_disease_class -> desired disease class to be loaded
-            t_plant_type -> desired plant type to be loaded
             label_extra_week: int -> week to consider when loading labels, i.e. should be complete
         """
         super().__init__(data_path, device, label_extra_week)
@@ -1024,14 +1025,12 @@ class SpectralDataset(SpectralDataset_v2):
 
             # Perform Merging
             self.meta_data = self.meta_data.merge(images_df, how='left')
+            self.configs_args = None
 
     
-    def set_filter_params(self):
+    def set_filter_params(self, config_args: ConfigArgs):
         """
-        Sets the filter for unique data loading
-
-        Arg:
-            None
+        
         """
 
             
