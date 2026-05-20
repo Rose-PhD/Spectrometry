@@ -11,7 +11,20 @@ class DataLoader:
 
 class SpectralDataLoader(DataLoader):
 
-    def __init__(self, dataset: SpectralDataset, batch_size: int, shuffle=False, permutate=False, permute_weeks=False):
+    def __init__(self, dataset: SpectralDataset, batch_size: int, shuffle: bool =False, permutate: bool =False, permute_weeks: bool=False):
+        """
+        Computes iterable batches around the dataset
+
+        Arg:
+            dataset: Dataset -> object of dataset to be loaded
+            batch_size: int -> size of the batches of the data to be loaded
+            shuffle: bool -> flags whether to shuffle data or not
+            permutate: bool -> flags whether to shuffle content of batches
+            permute_weeks: bool -> flags whether to shuffle weeks or not
+
+        Returns:
+            None 
+        """
         self.dataset = dataset
         self.batch_size = batch_size
         self.shuffle = shuffle
@@ -43,7 +56,6 @@ class SpectralDataLoader(DataLoader):
 
         for i in range(0, len(self.dataset), self.batch_size):
             selected_pos = self.indices[i: i + self.batch_size]
-            print(f'Selecting', selected_pos)
             
             temp_buffer_x = []
             temp_buffer_y = []

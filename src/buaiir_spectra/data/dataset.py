@@ -1025,8 +1025,10 @@ class SpectralDataset(SpectralDataset_v2):
 
             # Perform Merging
             self.meta_data = self.meta_data.merge(images_df, how='left')
-            self.configs_args = None
-            self.sub_meta_data = None
+        
+        # data filtering
+        self.configs_args = None
+        self.sub_meta_data = None
 
     
     def set_filter_params(self, config_args: ConfigArgs) -> None:
@@ -1069,6 +1071,7 @@ class SpectralDataset(SpectralDataset_v2):
         
         # set state
         self.sub_meta_data = meta_data.reset_index(drop=True)
+        # self.labels = (meta_data['search_label'].unique())
 
     def __len__(self):
         if self.configs_args is not None:
