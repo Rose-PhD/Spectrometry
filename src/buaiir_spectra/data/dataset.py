@@ -909,11 +909,6 @@ class SpectralDataset_v2(Dataset):
         Returns:
             data_obj: pd.Series -> meta data for the indexed record
         """
-        # Repulicate titer, week, disease, class, and expert score for the n readings
-        # columns drops l_1, l_2, l_3, img_count, 
-        # target vector titer_readings
-        # feature vector: raw_reading(7), week, plant_type
-
         n_data = self.meta_data.loc[index, 'raw_count']
         out_dim = None
         n_tiles = 1
@@ -990,11 +985,14 @@ class SpectralDataset(SpectralDataset_v2):
     
     """
    
-    def __init__(self, data_path: str, device: Device, label_extra_week: int=9):
+    def __init__(self, data_path: str, device: Device, t_week:int = None, t_disease_class: str= None, t_plant_type: str= None, label_extra_week: int=9):
         """
-        Args:
+        Arg:
             data_path-> str: path to where data is stored
             device -> Device: whose data should be loaded
+            t_week: int -> desired week to be loaded
+            t_disease_class -> desired disease class to be loaded
+            t_plant_type -> desired plant type to be loaded
             label_extra_week: int -> week to consider when loading labels, i.e. should be complete
         """
         super().__init__(data_path, device, label_extra_week)
@@ -1024,9 +1022,20 @@ class SpectralDataset(SpectralDataset_v2):
                 )
                 images_df.loc[mask, 'plant_number'] -= shift
 
-            # perform merging
+            # Perform Merging
             self.meta_data = self.meta_data.merge(images_df, how='left')
-        
+
+    
+    def set_filter_params(self):
+        """
+        Sets the filter for unique data loading
+
+        Arg:
+            None
+        """
+
+            
+     
 
 if __name__ == '__main__':
     from buaiir_spectra.utils.device import Device
