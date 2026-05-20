@@ -66,6 +66,7 @@ class SpectralDataset_v2(Dataset):
         self.create_disease_embeddings()
         self.create_plant_embeddings()
 
+        
     
     @staticmethod
     def _normalize_to_spectra_data(path: str, root_name:str = "spectra_data") -> str:
@@ -89,7 +90,6 @@ class SpectralDataset_v2(Dataset):
         idx = parts.index(root_name)
         new_path = Path(*parts[idx:])
         return new_path
-        
 
 
     @staticmethod
@@ -547,6 +547,18 @@ class SpectralDataset_v2(Dataset):
         msv_df = self._rename_df(msv_df)
         return (mln_df, msv_df)
     
+    @staticmethod
+    def _treat_undetected_cases(df: pd.DataFrame):
+        mask = (
+            (df['titer_1'] == 'undetected') | (df['titer_2'] == 'undetected') | (df['titer_3'] == 'undetected') | \
+            (df['titer_1'] == 'Undetected') | (df['titer_2'] == 'Undetected') | (df['titer_3'] == 'Undetected')
+        )
+
+        df.loc[
+            mask,
+            ['titer_1', 'titer_2', 'titer_3']
+        ] = [40.0, 40.0, 40.0]
+        return df
     
     def _get_expert_files_CASSAVA_CMD(self, df_path:str):
         """Extracts expert readings for CMD only from the source file"""
@@ -568,11 +580,11 @@ class SpectralDataset_v2(Dataset):
         cmd_df['week'] = cmd_df['week'].fillna(1)   # fill the first week of NaNs with 1
         cmd_df['week'] = cmd_df['week'].astype('int64')  # convert week to int64 from obj type
         cmd_df['disease_class'] = 'CMD'             # fill in disease class
-        return cmd_df
+        return self._treat_undetected_cases(cmd_df)
     
     def _get_expert_files_CASSAVA_CBB(self, df_path:str):
         """Extracts expert readings for CBB only from the source file"""
-        week_col = 'Cassava bacterial blight'
+        # week_col = 'Cassava bacterial blight'
         cbb_df = pd.read_excel(df_path, sheet_name='CBB')
 
         week_mask = cbb_df.iloc[:, 0].astype(str).str.match(r'^\s*week\s*\d+', case=False, na=False)    # create mask for rows with weeks type str
@@ -591,7 +603,7 @@ class SpectralDataset_v2(Dataset):
         cbb_df = cbb_df.drop(columns=['description']) # drop description column to ensure consistency
         cbb_df['week'] = cbb_df['week'].astype('int64')
         
-        return cbb_df
+        return self._treat_undetected_cases(cbb_df)
     
     def _get_expert_file_CASSAVA(self, df_path: str) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """
@@ -833,9 +845,9 @@ class SpectralDataset_v2(Dataset):
         spectral_1 = ast.literal_eval(df0['spectral_1'][0])
 
         if isinstance(spectral_1, dict):
-            spectral_2 = ast.literal_eval(df0['spectral_2'])
-            band_energy_1 = spectral_1['bandEnergy']
-            band_energy_2 = spectral_2['bandEnergy']
+            spectral_2 = ast.literal_eval(df0['spectral_2'][0])
+            band_energy_1 = list(spectral_1['bandEnergy'].values())
+            band_energy_2 = list(spectral_2['bandEnergy'].values())
             spectral_1 = spectral_1['intensity']
             spectral_2 = spectral_2['intensity']
         else:

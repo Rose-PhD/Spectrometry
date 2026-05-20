@@ -1,6 +1,7 @@
 from abc import abstractmethod
 import numpy as np
 from buaiir_spectra.data.dataset import SpectralDataset
+from buaiir_spectra.utils.device import Device
 
 
 class DataLoader:
@@ -62,9 +63,19 @@ class SpectralDataLoader(DataLoader):
 
             for index in selected_pos:
                 x, y = self.dataset[index]
-                temp_buffer_x.append(x)
-                temp_buffer_y.append(y)
+
+                if self.dataset.device == Device.LOW_COST:
+                    for i in range(2):
+                        temp_buffer_x.append(x[: , i, :])
+
+                    for i in range(3):
+                        temp_buffer_y.append(y[:, i, :])
+                else:
+                    temp_buffer_x.append(x)
+                    temp_buffer_y.append(y)
             
+            print(f'Selected position: ', selected_pos)
+
             temp_buffer_x = np.vstack(temp_buffer_x)
             temp_buffer_y = np.vstack(temp_buffer_y)
 
@@ -72,6 +83,7 @@ class SpectralDataLoader(DataLoader):
                 p_indices = np.random.permutation(len(temp_buffer_x))
                 temp_buffer_x = temp_buffer_x[p_indices]
                 temp_buffer_y = temp_buffer_y[p_indices]
+            
 
             yield temp_buffer_x, temp_buffer_y
 
@@ -81,8 +93,8 @@ if __name__ == '__main__':
 
     DATA_PATH = '/home/wilfred/Datasets/spectra_data'
 
-    dataset = SpectralDataset(DATA_PATH, Device.SCAN_CODER)
+    dataset = SpectralDataset(DATA_PATH, Device.LOW_COST)
     dataloader = SpectralDataLoader(dataset, batch_size=4)
 
-    print(dataset.meta_data[dataset.meta_data['raw_count'] <6])
+    print(dataset.meta_data[dataset.meta_data['raw_count'] <3])
 
