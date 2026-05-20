@@ -8,7 +8,6 @@ class DataLoader:
     @abstractmethod
     def __iter__(self):
         raise NotImplemented("Subclasses must implement this method")
-    
 
 class SpectralDataLoader(DataLoader):
 
@@ -32,22 +31,37 @@ class SpectralDataLoader(DataLoader):
         # Extract the indices
         pos = []
         for label in self.labels:
-            pos_i = self.dataset.meta_data[self.dataset.meta_data['search_label'] == label].values
+            pos_i = self.dataset.meta_data[self.dataset.meta_data['search_label'] == label].index.values
             pos.extend(pos_i)
         
         pos = np.array(pos)
         
-        # permutate the underlying indices
+        # Permutate the underlying indices
         if self.permutate_weeks:
             pos = np.random.permutation(pos)
         self.indices = pos
 
         for i in range(0, len(self.dataset), self.batch_size):
             selected_pos = self.indices[i: i + self.batch_size]
+            print(f'Selecting', selected_pos)
+            
+            temp_buffer_x = []
+            temp_buffer_y = []
 
+            for index in selected_pos:
+                x, y = self.dataset[index]
+                temp_buffer_x.append(x)
+                temp_buffer_y.append(y)
+            
+            temp_buffer_x = np.vstack(temp_buffer_x)
+            temp_buffer_y = np.vstack(temp_buffer_y)
 
-        
+            if self.permutate:
+                p_indices = np.random.permutation(len(temp_buffer_x))
+                temp_buffer_x = temp_buffer_x[p_indices]
+                temp_buffer_y = temp_buffer_y[p_indices]
 
+            yield temp_buffer_x, temp_buffer_y
 
 if __name__ == '__main__':
     from buaiir_spectra.data.dataset import SpectralDataset
@@ -55,8 +69,8 @@ if __name__ == '__main__':
 
     DATA_PATH = '/home/wilfred/Datasets/spectra_data'
 
-    dataset = SpectralDataset(DATA_PATH, Device.BIO_SCIENCE)
+    dataset = SpectralDataset(DATA_PATH, Device.SCAN_CODER)
     dataloader = SpectralDataLoader(dataset, batch_size=4)
 
-    print(dataset.labels)
+    print(dataset.meta_data[dataset.meta_data['raw_count'] <6])
 
