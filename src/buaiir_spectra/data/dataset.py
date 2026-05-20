@@ -1068,7 +1068,7 @@ class SpectralDataset(SpectralDataset_v2):
             self.disease_class_codes = {t_disease_class: self.disease_class_codes[t_disease_class]}
         
         # set state
-        self.sub_meta_data = meta_data
+        self.sub_meta_data = meta_data.reset_index(drop=True)
 
     def __len__(self):
         if self.configs_args is not None:
@@ -1121,15 +1121,33 @@ if __name__ == '__main__':
     from buaiir_spectra.utils.config_args import ConfigArgs
 
     data_path = '/home/wilfred/Datasets/spectra_data'
-    dataset = SpectralDataset(data_path, Device.LOW_COST)
+    dataset = SpectralDataset(data_path, Device.BIO_SCIENCE)
 
-    cf1 = ConfigArgs(t_plant_type='M')
+    cf1 = ConfigArgs(t_plant_type='M', t_disease_class='MSV', t_week=3)
     dataset.set_filter_params(config_args=cf1)
 
-    print(dataset.sub_meta_data)
+    print(dataset.sub_meta_data.loc[:, ['week', 'disease_class', 'plant_type','titer_1', 'titer_2', 'titer_3']])
     print(dataset.disease_class_codes)
     print(dataset.plant_type_codes)
     print(len(dataset))
+
+    # load the data to ensure propagation of states
+
+    # dataset.reset()
+
+    x, y = dataset[0]
+    print('Features', x)
+    print(f'Target Data', y, sep='\n')
+
+    x, y = dataset[1]
+    print('Features', x)
+    print(f'Target Data', y, sep='\n')
+
+    
+
+
+
+
 
 
     
