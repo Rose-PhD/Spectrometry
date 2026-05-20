@@ -6,14 +6,14 @@ class ConfigArgs:
     Sets the configuration paremters 
 
     Arg:
-        t_week: desired week to be loaded
-        t_disease_class: desired class to be loaded
         t_plant_type: desired plant type to be loaded
+        t_disease_class: desired class to be loaded
+        t_week: desired week to be loaded
 
     """
-    t_week: int | None = None
-    t_disease_class: str | None = None
     t_plant_type: str | None = None
+    t_disease_class: str | None = None
+    t_week: int | None = None
 
     # allowed diseases for each plant
     VALID_CLASSES = {
@@ -80,6 +80,7 @@ if __name__ == '__main__':
     cf0 = ConfigArgs(t_disease_class='CMD', t_plant_type='C')
 
     print(cf0.t_disease_class, cf0.t_plant_type)
+    print(cf0.VALID_CLASSES['C'])
 
 
     
