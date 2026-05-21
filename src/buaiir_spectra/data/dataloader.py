@@ -2,6 +2,7 @@ from abc import abstractmethod
 import numpy as np
 from buaiir_spectra.data.dataset import Dataset
 from buaiir_spectra.utils.device import Device
+from typing import List, Tuple
 
 
 class DataLoader:
@@ -34,7 +35,9 @@ class SpectralDataLoader(DataLoader):
 
         # labels
         self.labels = dataset.labels
+        self.unshuffled_pos = None
         self.pos, self.indices = self._compute_indices()
+
     
     
     def _compute_indices(self):
@@ -66,6 +69,9 @@ class SpectralDataLoader(DataLoader):
         pos = np.array(pos)
         pos = pos[:, 1:]
 
+        # keep a copy of unshuffled order
+        self.unshuffled_pos = np.array(pos)
+
         if self.permutate_plants:
             pos = np.random.permutation(pos)
         
@@ -82,6 +88,65 @@ class SpectralDataLoader(DataLoader):
             indices = np.random.permutation(indices)
 
         return pos, indices
+    
+    def load_data_of(self, label: str | int):
+        """
+        Loads all data for a single label for analysis
+
+        """
+        label = label.strip().upper() if isinstance(label, str) else label
+
+        if isinstance(label, str) and not label in self.labels:
+            raise ValueError(
+                f"{label} not among the labels consider choosing from "
+                f'{list(self.labels)}'
+            )
+        
+        if isinstance(label, int) and not label in range(0, len(self.labels)):
+            raise IndexError(
+                f"Label index is out of range"
+                f"Max supported is {len(self.labels)}"
+            )
+        
+        label_index = self.labels.index(label) if isinstance(label, str) else label
+        label_pos = self.unshuffled_pos[label_index, :]
+
+        # drop Nan values
+        label_pos = label_pos[~np.isnan(label_pos)]
+
+        # call the dataloader to load all the data
+        return self._load_single(label_pos)
+
+
+    def _load_single(self, selected_pos: List[int]) -> Tuple[np.ndarray]:
+        """
+        Loads data for a subset of selected indices
+
+        Arg:
+            selected_pos: List[int] -> collections of selected indices
+
+        Return:
+            Tuple[np.ndarray] -> List of temporay buffer of (Features, targets)
+        """
+        temp_buffer_x = []
+        temp_buffer_y = []
+
+        for index in selected_pos:
+            x, y = self.dataset[index]
+
+            if self.dataset.device == Device.LOW_COST:
+                for i in range(2):
+                    temp_buffer_x.append(x[: , i, :])
+
+                for i in range(3):
+                        temp_buffer_y.append(y[:, i, :])
+            else:
+                temp_buffer_x.append(x)
+                temp_buffer_y.append(y)
+        
+        return np.vstack(temp_buffer_x), np.vstack(temp_buffer_y)
+
+        
             
 
     def __iter__(self):
@@ -91,27 +156,8 @@ class SpectralDataLoader(DataLoader):
 
         for i in range(0, n_data, batch_size):
             selected_pos = self.indices[i: i + batch_size]
-            
-            temp_buffer_x = []
-            temp_buffer_y = []
 
-            for index in selected_pos:
-                x, y = self.dataset[index]
-
-                if self.dataset.device == Device.LOW_COST:
-                    for i in range(2):
-                        temp_buffer_x.append(x[: , i, :])
-
-                    for i in range(3):
-                        temp_buffer_y.append(y[:, i, :])
-                else:
-                    temp_buffer_x.append(x)
-                    temp_buffer_y.append(y)
-            
-            print(f'Selected position: ', selected_pos)
-
-            temp_buffer_x = np.vstack(temp_buffer_x)
-            temp_buffer_y = np.vstack(temp_buffer_y)
+            temp_buffer_x, temp_buffer_y = self._load_single(selected_pos)
 
             if self.permutate:
                 p_indices = np.random.permutation(len(temp_buffer_x))
