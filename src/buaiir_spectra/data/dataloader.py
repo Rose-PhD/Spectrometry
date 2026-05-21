@@ -116,6 +116,41 @@ class SpectralDataLoader(DataLoader):
 
         # call the dataloader to load all the data
         return self._load_single(label_pos)
+    
+    def load_data_of_disease_class(self, disease_class: str):
+        """
+
+        Loads data of  a single disease class e.g. BLB, MSV, MLN
+
+        Arg:
+            disease_class: str -> identifier of the disease
+        """
+
+        meta_data = self.dataset.meta_data
+        classes_ = list(self.dataset.disease_class_codes.keys())
+
+        # Normalize 
+        if isinstance(disease_class, str): 
+            disease_class = disease_class.strip().upper()
+            
+            if disease_class not in classes_:
+                raise ValueError(
+                    f"Disease class not supported"
+                    f"Choose from {classes_}"
+                )
+        
+        elif isinstance(disease_class, int):
+            values = list(self.dataset.disease_class_codes.values())
+            
+            if disease_class not in values:
+                raise ValueError(
+                    f"Disease code not supported"
+                    f"Chosse from {list(class_indices)}"
+                )
+            disease_class = classes_[values.index(disease_class)]
+
+        indices = meta_data[meta_data['disease_class'] == disease_class].index.values
+        return self._load_single(indices)
 
 
     def _load_single(self, selected_pos: List[int]) -> Tuple[np.ndarray]:
