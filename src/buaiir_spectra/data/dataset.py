@@ -1041,7 +1041,8 @@ class SpectralDataset_v2(Dataset):
             out_dim = spectral_range_size
         else:
             spectral_range_size = 381
-            band_energy = 6
+            # band_energy = 6
+            band_energy = 0 # eliminate band energy for now
             out_dim = spectral_range_size + band_energy
             n_tiles += 1
 
@@ -1083,11 +1084,13 @@ class SpectralDataset_v2(Dataset):
             if self.device == Device.SCAN_CODER:
                 x_out[i, :] = file
             elif self.device == Device.LOW_COST:
-                spectral_1, spectra_2, band_energy_1, band_energy_2 = file
+                spectral_1, spectra_2, _, _ = file
                 x_out[i, 0, :spectral_range_size] = spectral_1
-                x_out[i, 0, spectral_range_size:] = band_energy_1
+                # Eliminate band enery computation for now
+                # x_out[i, 0, spectral_range_size:] = band_energy_1
+                # x_out[i, 1, spectral_range_size:] = band_energy_2  
                 x_out[i, 1, :spectral_range_size] = spectra_2
-                x_out[i, 1, spectral_range_size:] = band_energy_2
+                
             
             else:
                 # raw_data, _ , _ = file_
@@ -1139,98 +1142,7 @@ class SpectralDataset(SpectralDataset_v2):
 
             # Perform Merging
             self.meta_data = self.meta_data.merge(images_df, how='left')
-        
-        # data filtering
-        # self.configs_args = None
-        # self.sub_meta_data = None
-
-    
-    # def set_filter_params(self, config_args: ConfigArgs) -> None:
-    #     """
-    #     Sets data filtering arguments for specific target loads
-
-    #     Arg:
-    #         config_args: ConfigArgs -> defines configurations of t_plant_type, t_disease_class, t_week
-    #     """
-    #     self.configs_args = config_args
-    #     self.update_sub_meta_data()
-    
-    # def update_sub_meta_data(self) -> None:
-    #     """
-    #     Computes the sub_meta_data of the filter
-
-    #     """
-
-    #     meta_data = self.meta_data.copy()
-
-    #     # Intermediate state computation
-    #     t_week = self.configs_args.t_week
-    #     t_disease_class =self.configs_args.t_disease_class
-    #     t_plant_type = self.configs_args.t_plant_type
-
-    #     if t_week is not None:
-    #         meta_data = meta_data[meta_data['week'] == t_week]
-        
-    #     if t_plant_type is not None:
-    #         meta_data = meta_data[meta_data['plant_type'] == t_plant_type]
-    #         self.plant_type_codes = {t_plant_type: self.plant_type_codes[t_plant_type]}
-    #         # compute the correct disease classes
-    #         self.disease_class_codes = {
-    #             d: self.disease_class_codes[d] for d in self.configs_args.VALID_CLASSES[t_plant_type]
-    #         }
-        
-    #     if t_disease_class is not None:
-    #         meta_data = meta_data[meta_data['disease_class'] == t_disease_class]
-    #         self.disease_class_codes = {t_disease_class: self.disease_class_codes[t_disease_class]}
-        
-    #     # set state
-    #     self.sub_meta_data = meta_data.reset_index(drop=True)
-    #     # self.labels = (meta_data['search_label'].unique())
-
-    # def __len__(self):
-    #     if self.configs_args is not None:
-    #         return len(self.sub_meta_data)
-        
-    #     else:
-    #         return super().__len__()
-
-    
-    # def __getitem__(self, index: int):
-    #     """
-    #     Loads a data for a single reading from the data
-
-    #     Arg:
-    #         index: int -> position of target to be loaded into memory
-    #     """
-    #     if self.configs_args is not None:
-    #         temp = self.meta_data
-    #         self.meta_data = self.sub_meta_data
-
-    #         out = super().__getitem__(index)
-
-    #         # Retore state
-    #         self.meta_data = temp
-    #     else:
-    #         out = super().__getitem__(index)
-        
-    #     return out
-    
-    # def reset(self) -> None:
-    #     """
-    #     Resets that state of the data object to enable computation over the entire data
-
-    #     Arg:
-    #         None
-    #     Returns:
-    #         None
-    #     """
-    #     self.sub_meta_data = None
-    #     self.configs_args = None
-        
-    #     # Rest the embeddings for diseases and plants
-    #     self.create_disease_embeddings()
-    #     self.create_plant_embeddings()
-
+ 
 
 if __name__ == '__main__':
     from buaiir_spectra.utils.device import Device
