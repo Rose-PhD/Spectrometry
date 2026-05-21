@@ -211,5 +211,3 @@ if __name__ == '__main__':
     dataset = SpectralDataset(DATA_PATH, Device.LOW_COST)
     dataloader = SpectralDataLoader(dataset, batch_size=4)
 
-    # print(dataset.meta_data[dataset.meta_data['raw_count'] <3])
-
