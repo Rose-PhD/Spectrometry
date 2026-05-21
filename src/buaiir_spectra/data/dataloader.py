@@ -12,23 +12,22 @@ class DataLoader:
 
 class SpectralDataLoader(DataLoader):
     
-    def __init__(self, dataset: Dataset, batch_size: int, shuffle: bool=False, permutate: bool =False, permutate_weeks: bool=False, permutate_plants:bool= False):
+    def __init__(self, dataset: Dataset, batch_size: int, permutate: bool =False, permutate_weeks: bool=False, permutate_plants:bool= False):
         """
         Computes iterable batches around the dataset
 
         Arg:
             dataset: Dataset -> object of dataset to be loaded
             batch_size: int -> size of the batches of the data to be loaded
-            shuffle: bool -> flags whether to shuffle data or not
-            permutate: bool -> flags whether to shuffle content of batches
-            permute_weeks: bool -> flags whether to shuffle weeks or not
+            permutate: bool -> shuffles the order both plants and weeks
+            permutate_plants: bool -> shuffles the order of plants only
+            permutate_weeks: bool -> shuffles the oder of weeks only
 
         Returns:
             None 
         """
         self.dataset = dataset
         self.batch_size = batch_size
-        self.shuffle = shuffle
         self.permutate = permutate
         self.permutate_weeks= permutate_weeks
         self.permutate_plants = permutate_plants
