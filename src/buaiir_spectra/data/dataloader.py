@@ -1,6 +1,6 @@
 from abc import abstractmethod
 import numpy as np
-from buaiir_spectra.data.dataset import SpectralDataset
+from buaiir_spectra.data.dataset import Dataset
 from buaiir_spectra.utils.device import Device
 
 
@@ -12,7 +12,7 @@ class DataLoader:
 
 class SpectralDataLoader(DataLoader):
     
-    def __init__(self, dataset: SpectralDataset, batch_size: int, shuffle: bool=False, permutate: bool =False, permutate_weeks: bool=False, permutate_plants:bool= False):
+    def __init__(self, dataset: Dataset, batch_size: int, shuffle: bool=False, permutate: bool =False, permutate_weeks: bool=False, permutate_plants:bool= False):
         """
         Computes iterable batches around the dataset
 

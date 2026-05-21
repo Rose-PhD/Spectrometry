@@ -545,6 +545,11 @@ class SpectralDataset_v2(Dataset):
         # Rename MLN and MSV df
         mln_df = self._rename_df(mln_df)
         msv_df = self._rename_df(msv_df)
+
+        # Compute average titer readings
+        mln_df['titer_avg'] = mln_df.apply(self.robust_titer_mean, axis=1)
+        msv_df['titer_avg'] = msv_df.apply(self.robust_titer_mean, axis=1)
+
         return (mln_df, msv_df)
     
     @staticmethod
@@ -604,6 +609,29 @@ class SpectralDataset_v2(Dataset):
         cbb_df['week'] = cbb_df['week'].astype('int64')
         
         return self._treat_undetected_cases(cbb_df)
+
+    @staticmethod
+    def robust_titer_mean(row, threshold:float =0.05):
+        """
+        Computes the mean titer value
+
+        Arg:
+            threshold: float -> level of signifinace above which value if dropped
+        """
+        values = np.array([
+            row['titer_1'],
+            row['titer_2'],
+            row['titer_3']
+        ], dtype='float')
+
+        # compute reference value
+        ref = np.median(values)
+        valid  = values[np.abs(values - ref) / ref <= threshold]
+
+        if len(valid) == 0:
+            return np.nan
+        
+        return valid.mean()
     
     def _get_expert_file_CASSAVA(self, df_path: str) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """
@@ -618,6 +646,10 @@ class SpectralDataset_v2(Dataset):
         """
         cmd_df = self._get_expert_files_CASSAVA_CMD(df_path)
         cbb_df = self._get_expert_files_CASSAVA_CBB(df_path)
+
+        # apply computation of average titer values
+        cmd_df['titer_avg'] = cmd_df.apply(self.robust_titer_mean, axis=1)
+        cbb_df['titer_avg'] = cbb_df.apply(self.robust_titer_mean, axis=1)
         
         return (cmd_df, cbb_df)
     
@@ -683,6 +715,9 @@ class SpectralDataset_v2(Dataset):
 
         # reordering the columns for consistent merger
         beans_df = beans_df[['plant_number', 'score', 'titer_1', 'l_1', 'titer_2', 'l_2', 'titer_3', 'l_3', 'week', 'disease_class']]
+
+        # Compute titer readings for beans
+        beans_df['titer_avg'] = beans_df.apply(self.robust_titer_mean, axis=1)
         return beans_df
 
     
@@ -1010,8 +1045,8 @@ class SpectralDataset_v2(Dataset):
             out_dim = spectral_range_size + band_energy
             n_tiles += 1
 
-        # Targe features
-        N_titer_readings = 3
+        # Size of target features 
+        N_titer_readings = 1
         Disease_class_size = 1
         week_size = 1
         expert_score_size = 1
@@ -1027,8 +1062,7 @@ class SpectralDataset_v2(Dataset):
         y_out = np.zeros(N_titer_readings + Disease_class_size + week_size + expert_score_size)
 
         # Fill in the target data
-        target_cols = [f'titer_{i}' for i in range(1, 4)]
-        target_cols.extend(['score', 'week', 'disease_class'])
+        target_cols = (['titer_avg','score', 'week', 'disease_class'])
         n_cols = len(target_cols)
 
         for i in range(n_cols):
