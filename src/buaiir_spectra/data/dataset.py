@@ -739,7 +739,7 @@ class SpectralDataset_v2(Dataset):
     def get_weekly_data(self, week: int):
         """Returns data for a specific week"""
         return self.meta_data[self.meta_data['week'] == week]
-    
+        
 
     @staticmethod
     def read_single_BIOSCIENCE(path: str) -> List[pd.DataFrame]:
@@ -800,10 +800,75 @@ class SpectralDataset_v2(Dataset):
         
         # Reference index
         RAW_SPECTRA_INDEX = -3
-        PEAK_VALUES_INDEX = -2
-        CALIBRATION_INDEX = -1
+        # PEAK_VALUES_INDEX = -2
+        # CALIBRATION_INDEX = -1
 
-        return make_compartible(RAW_SPECTRA_INDEX), make_compartible(PEAK_VALUES_INDEX), make_compartible(CALIBRATION_INDEX) 
+        # return make_compartible(RAW_SPECTRA_INDEX), make_compartible(PEAK_VALUES_INDEX), make_compartible(CALIBRATION_INDEX) 
+        return make_compartible(RAW_SPECTRA_INDEX) 
+    
+    @staticmethod
+    def read_single_BIOSCIENCE_v2(path: str):
+        """
+        Reads Raw data, peak wavelength information, and calibration for BIO_SCIENCE
+
+        Arg:
+            path: str -> path of file to read
+        
+        Returns:
+            RAW_DATA_FILE: pd.DataFrame -> Contains the raw spectral readings
+            PEAK_WAVELENGTH_FILE: pd.DataFrame -> Contains the peak wavelength
+            CALIBRATION_FILE: pd.DataFrame -> Contains calibration data
+        """
+
+        headers = []
+        sections  = []
+        current_section = []
+
+        # compile once 
+        number_pattern = re.compile(
+                r"^\s*-?\d+(\.\d+)?([eE]-?\d+)?%?\s*$"
+        )
+
+        with open(path, 'r') as f:
+            for line in f:
+                line = line.strip()
+
+                if not line:
+                    if current_section:
+                        sections.append(current_section)
+                        current_section= []
+                        continue
+
+                    continue
+                # Fater numeric check
+                first_token = line.split(",", 1)[0]
+                if not number_pattern.match(first_token):
+                    headers.append(line)
+
+                else:
+                    current_section.append(line)
+
+        # append training section if file does not end with newline
+        if current_section:
+            sections.append(current_section)
+
+        RAW_SPECTRAL_INDEX = -3
+        raw_lines = sections[RAW_SPECTRAL_INDEX]
+
+        # starter numeric conversion
+        array = np.vstack([
+            np.fromstring(
+                line.replace("%", ""),
+                sep=",",
+                dtype=np.float32
+            )
+            for line in raw_lines
+        ])
+
+        columns = headers[RAW_SPECTRAL_INDEX].split(",")
+        return  pd.DataFrame(array, columns=columns)
+
+
     
     def read_one_BIOSCIENCE(self, index) -> iter:
         """
@@ -813,7 +878,8 @@ class SpectralDataset_v2(Dataset):
             index -> position to tagert file
         """
         for file in self.meta_data.loc[index, 'specimen_data_dirs']:
-            yield self.read_single_BIOSCIENCE(file)
+            # yield self.read_single_BIOSCIENCE(file)
+            yield self.read_single_BIOSCIENCE_v2(file)
 
 
     def read_one_SCAN_CODER(self, index: int) -> iter:
@@ -919,7 +985,7 @@ class SpectralDataset_v2(Dataset):
         """
         Extracts the meta data of a single readings
 
-        Args:
+        Arg:
             index: int -> index of record to be read
 
         Returns:
@@ -989,7 +1055,8 @@ class SpectralDataset_v2(Dataset):
                 x_out[i, 1, spectral_range_size:] = band_energy_2
             
             else:
-                raw_data, _ , _ = file # calibration data not required for -> _
+                # raw_data, _ , _ = file_
+                raw_data = file
                 x_out[i, :spectral_range_size] = raw_data[raw_data.columns[-1]].values
                 
         return x_out, y_out
