@@ -181,8 +181,6 @@ class SpectralDataLoader(DataLoader):
         
         return np.vstack(temp_buffer_x), np.vstack(temp_buffer_y)
 
-        
-            
 
     def __iter__(self):
 
@@ -201,6 +199,8 @@ class SpectralDataLoader(DataLoader):
             
 
             yield temp_buffer_x, temp_buffer_y
+
+
 
 if __name__ == '__main__':
     from buaiir_spectra.data.dataset import SpectralDataset
