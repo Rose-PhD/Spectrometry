@@ -65,6 +65,7 @@ class SpectralDataset_v2(Dataset):
         self.populate_expert_readings()
         self.create_disease_embeddings()
         self.create_plant_embeddings()
+        self._compute_wavelength()
 
         
     
@@ -391,8 +392,26 @@ class SpectralDataset_v2(Dataset):
             self.meta_data['disease_class'].astype(str) +
             self.meta_data['plant_number'].astype(str)
         )
+        # compute wavelength data
         self.labels = list(self.meta_data[self.meta_data['week'] == self.label_extra_week]['search_label'].unique())
 
+    def _compute_wavelength(self):
+        """
+        Computes wavelegth information for the LOW COST device
+        """
+
+        if self.device == Device.LOW_COST:
+
+            f0 = self.meta_data.loc[0, 'specimen_data_dirs'][0]
+            df0 = pd.read_csv(f0)
+            
+            self.wavelength = ast.literal_eval(df0.loc[:, 'wavelength'][0])
+
+        
+        elif self.device == Device.BIO_SCIENCE:
+            f0 = self.meta_data.loc[0, 'specimen_data_dirs'][0]
+            self.wavelength = self.read_single_BIOSCIENCE_v2(f0)['Wavelength'].values
+        
     
     def _extract_other_mata_info_SCAN_CORDER(self, label):
         """Extracts the sort key, plant type and disease type"""
@@ -496,6 +515,8 @@ class SpectralDataset_v2(Dataset):
 
         # Convert dict back to pandas dataframe
         grouped_df = pd.DataFrame(grouped_samples.values())  
+        
+        self.wavelength = np.array([float(i) for i in self.wavelength_cols])
         return grouped_df
     
     @staticmethod
