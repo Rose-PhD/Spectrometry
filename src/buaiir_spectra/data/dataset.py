@@ -981,15 +981,16 @@ class SpectralDataset_v2(Dataset):
         self.plant_type_codes = {c: i for i, c in enumerate(plant_types)}
 
     
-    def __getitem__(self, index: int) -> pd.Series:
+    def __getitem__(self, index: int) -> Tuple[np.ndarray]:
         """
-        Extracts the meta data of a single readings
+        Return features and target matrix
 
         Arg:
             index: int -> index of record to be read
 
-        Returns:
-            data_obj: pd.Series -> meta data for the indexed record
+        Return:
+            Feature maxtrix: np.ndarray -> raw spectral readings depending on the device
+            Target matrix: np.ndrray -> contains the following ordered information (titer_1, titer_2, titer_3, expert_score, week, disease_class)
         """
         n_data = self.meta_data.loc[index, 'raw_count']
         out_dim = None
@@ -997,7 +998,7 @@ class SpectralDataset_v2(Dataset):
 
         if self.device == Device.BIO_SCIENCE:
             spectral_range_size = 3648
-            peak_wavelength_size = 0 # Peak wavelength are inconsistent
+            peak_wavelength_size = 0 # Peak wavelength are inconsistent, neglect
             out_dim = spectral_range_size + peak_wavelength_size
         
         elif self.device == Device.SCAN_CODER:
@@ -1203,7 +1204,7 @@ if __name__ == '__main__':
     from buaiir_spectra.utils.config_args import ConfigArgs
 
     data_path = '/home/wilfred/Datasets/spectra_data'
-    dataset = SpectralDataset(data_path, Device.BIO_SCIENCE)
+    dataset = SpectralDataset(data_path, Device.LOW_COST)
 
     cf1 = ConfigArgs(t_plant_type='M', t_disease_class='MSV', t_week=3)
     dataset.set_filter_params(config_args=cf1)
@@ -1224,6 +1225,11 @@ if __name__ == '__main__':
     x, y = dataset[1]
     print('Features', x)
     print(f'Target Data', y, sep='\n')
+
+    # DISEASE_CLASS = input('Enter disease class: ')
+    # filter = dataset.meta_data[dataset.meta_data['disease_class'] == DISEASE_CLASS]
+
+    # print(filter)
 
     
 

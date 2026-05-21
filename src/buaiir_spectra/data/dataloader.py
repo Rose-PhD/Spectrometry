@@ -11,8 +11,8 @@ class DataLoader:
         raise NotImplemented("Subclasses must implement this method")
 
 class SpectralDataLoader(DataLoader):
-
-    def __init__(self, dataset: SpectralDataset, batch_size: int, shuffle: bool =False, permutate: bool =False, permute_weeks: bool=False):
+    
+    def __init__(self, dataset: SpectralDataset, batch_size: int, shuffle: bool=False, permutate: bool =False, permutate_weeks: bool=False, permutate_plants:bool= False):
         """
         Computes iterable batches around the dataset
 
@@ -30,33 +30,68 @@ class SpectralDataLoader(DataLoader):
         self.batch_size = batch_size
         self.shuffle = shuffle
         self.permutate = permutate
-        self.permutate_weeks= permute_weeks
+        self.permutate_weeks= permutate_weeks
+        self.permutate_plants = permutate_plants
 
         # labels
         self.labels = dataset.labels
+        self.pos, self.indices = self._compute_indices()
+    
+    
+    def _compute_indices(self):
+        """
+        Computes the indices used during data loading
+
+        Arg:
+            None
+        
+        Return:
+            None
+        """
+        # Retrive the number of weeks
+        n_weeks = len(self.dataset.weeks.keys()) + 1
+        pos = []
+        
+        for label in self.labels:
+            res_array = np.full(n_weeks, np.nan)
+            result = self.dataset.meta_data.loc[self.dataset.meta_data['search_label'] == label, ['week']]
+
+            tuples_ = list(zip(result.index, result['week']))
+            # fill in data in correct position
+            for _index, week in tuples_:
+                res_array[week] = _index
+            
+            pos.append(res_array)
+        
+        # clean pos array and drop week 0
+        pos = np.array(pos)
+        pos = pos[:, 1:]
+
+        if self.permutate_plants:
+            pos = np.random.permutation(pos)
+        
+
+        indices = pos.transpose()
+
+        if self.permutate_weeks:
+            indices = np.random.permutation(indices)
+        
+        indices = indices.flatten()
+        indices = indices[~np.isnan(indices)]
+
+        if self.permutate:
+            indices = np.random.permutation(indices)
+
+        return pos, indices
+            
 
     def __iter__(self):
-        
-        label_indices = np.arange(len(self.labels))
-        if self.shuffle:
-            label_indices = np.random.permutation(label_indices)
-            self.labels = [self.labels[item] for item in label_indices]
 
-        # Extract the indices
-        pos = []
-        for label in self.labels:
-            pos_i = self.dataset.meta_data[self.dataset.meta_data['search_label'] == label].index.values
-            pos.extend(pos_i)
-        
-        pos = np.array(pos)
-        
-        # Permutate the underlying indices
-        if self.permutate_weeks:
-            pos = np.random.permutation(pos)
-        self.indices = pos
+        n_data = len(self.indices)
+        batch_size = self.batch_size
 
-        for i in range(0, len(self.dataset), self.batch_size):
-            selected_pos = self.indices[i: i + self.batch_size]
+        for i in range(0, n_data, batch_size):
+            selected_pos = self.indices[i: i + batch_size]
             
             temp_buffer_x = []
             temp_buffer_y = []
@@ -96,5 +131,5 @@ if __name__ == '__main__':
     dataset = SpectralDataset(DATA_PATH, Device.LOW_COST)
     dataloader = SpectralDataLoader(dataset, batch_size=4)
 
-    print(dataset.meta_data[dataset.meta_data['raw_count'] <3])
+    # print(dataset.meta_data[dataset.meta_data['raw_count'] <3])
 
