@@ -1,0 +1,34 @@
+# virtual environments
+.venv/
+venv/
+
+# python cache
+__pycache__/
+*.py[cod]
+
+# local datasets
+*.csv
+spectra_data/
+spectral_data/
+
+# notebooks
+notebooks/
+.ipynb_checkpoints/
+
+# build artifacts
+build/
+dist/
+*.egg-info/
+
+# misc
+.claude/
+dict/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+.env
+
+src/buaiir_spectra/data_splits/*
+src/buaiir_spectra/utils/config_info.py

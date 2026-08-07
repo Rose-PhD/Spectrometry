@@ -1,0 +1,55 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "buaiir_spectra"
+version = "1.3.13.1"
+description = "Spectrometry and spectral analysis tools from BUAIIR datasets"
+readme = "README.md"
+requires-python = ">=3.10"
+
+
+
+authors = [
+    {name = "Wilfred Kisitu"},
+    {name="Nalwanga Rosemary"},
+    {name="Bateesa Saul Tobius"},
+    {name="Owomugisha Godliver"}
+]
+dependencies = [
+    "numpy",
+    "pandas",
+    "openpyxl",
+    "joblib",
+    "pillow",
+    "tqdm",
+    "tqdm-joblib",
+    "huggingface_hub",
+    "python-dotenv",
+    "hf_transfer"
+]
+
+keywords= [
+    "spectrometry",
+    "spectral-analysis",
+    "machine-learning",
+    "deep-learning",
+    "biosensing"
+]
+classifiers= [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent"
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.package-data]
+buaiir_spectra = [
+    "*.pkl",
+]
