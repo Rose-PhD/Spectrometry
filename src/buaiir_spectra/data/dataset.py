@@ -11,10 +11,13 @@ from enum import Enum
 import concurrent.futures
 from huggingface_hub import snapshot_download
 from buaiir_spectra.utils.config_info import RAW_ACCESS
+import joblib
+from importlib import resources
 
 
 SEED = 42
 DATA_PATH = Path('/home/wilfred/Downloads/spectra_data_clean')
+WAVLENGTH_PATH = resources.files("buaiir_spectra").joinpath("wavelength_and_cols_ds.pkl")
 np.random.seed(SEED)
 
 
@@ -256,7 +259,6 @@ class B_Device:
             img = img[0]
     
         return x, img, y
-
 
 
 # COMPUTATION PIPELINE FOR THE LOW COST DEVICE
@@ -557,6 +559,18 @@ class Device(Enum):
     def get_devices(cls):
         return list(cls)
 
+# BUILDING ACCESS TO WAVELENGTH DATA
+wavelength = joblib.load(WAVLENGTH_PATH)
+device_keys = wavelength.keys() # corrupted keys
+correct_keys = Device.get_devices() # clean keys
+
+device_dict = {correct_key_pos: device_key_pos for correct_key_pos, device_key_pos in zip(correct_keys, device_keys)} # build key maps
+
+# define wavlenght 
+def get_wavelength(device: Device, wavelength=wavelength, device_dict=device_dict):
+    return wavelength[device_dict[device]]['wavelenght']
+
+
 class SpectralDataset:
 
     def __init__(self, root, device: Device):
@@ -592,6 +606,7 @@ class SpectralDataset:
         # Keep Buffers for futher computations 
         self.final_df = final_df 
         self.device = device
+        self.wavelength = get_wavelength(device)
             
     def __len__(self):
         return len(self.final_df)
