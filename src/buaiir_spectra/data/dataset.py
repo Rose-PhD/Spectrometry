@@ -443,9 +443,25 @@ class L_Device:
         if isinstance(spec_1, dict):
             spec_1 = spec_1['intensity']
             spec_2 = spec_2['intensity']
+            calibration = ast.literal_eval(x_f.loc[: "calibration"][0])["intensity"]
+        else:
+            calibration = ast.literal_eval(x_f.loc[:, "calibration"][0])
+
+        # Type conversion
+        calibration = np.array(calibration, dtype=np.float32)
+        spec_1 = np.array(spec_1, dtype=np.float32)
+        spec_2 = np.array(spec_2, dtype=np.float32)
+
+        # calibration
+        EPS =   1e-6
+        EPS_1 = np.mean(spec_1) / np.maximum(np.mean(calibration), EPS)
+        EPS_2 = np.mean(spec_2) / np.maximum(np.mean(calibration), EPS)
+
+        spec_1 = (spec_1 + calibration) / np.maximum(spec_1 - calibration, EPS_1)
+        spec_2 = (spec_2 + calibration) / np.maximum(spec_2 - calibration, EPS_2)
     
-        spec_1 = np.array(spec_1, dtype=np.float32)[None, :]
-        spec_2 = np.array(spec_2, dtype=np.float32)[None: ]
+        spec_1 = spec_1[None, :]
+        spec_2 = spec_2[None,: ]
     
         x = np.vstack([spec_1, spec_2])
         y = pd.DataFrame(data= [y_f.values, y_f.values], columns= y_f.index.to_list())
