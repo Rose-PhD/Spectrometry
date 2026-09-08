@@ -18,11 +18,11 @@ The spectral dataset was collected using three different devices:
 
 For each device, spectral data was collected across three crop types:
 
-| Crop    | Total Samples | Class Breakdown     |
-| ------- | ------------- | ------------------- |
-| Beans   | 15            | 5 HLT, 5 BRD, 5 BLB |
-| Maize   | 15            | 5 HLT, 5 MSV, 5 MLN |
-| Cassava | 15            | 5 HLT, 5 CMD, 5 CBB |
+| Crop    | Total Samples | Class Breakdown      |
+| ------- | ------------- | -------------------- |
+| Beans   | 15            | 5 HLT, 5 BRD, 5 BLB  |
+| Maize   | 15            | 5 HLT, 5 MSV, 5 MLN  |
+| Cassava | 15            | 5 HLT, 5 CBSD, 5 CBB |
 
 Each crop type was subjected to controlled inoculation with viral and bacterial diseases, resulting in multiple classification labels per crop.
 
@@ -76,33 +76,26 @@ Make sure you have Python 3.8+ installed. The library is designed to work with c
 Dataloading per device using load_spectra function
 
 ```python
-from buaiir_spectra.data.load_fn import load_spectra
+from buaiir_spectra.data.dataset import *
+from pathlib import Path
 
 # Load data for BIO_SCIENCE device
-lf = load_spectra(device=Device.BIO_SCIENCE, shuffle=False, no_files_per_load=4, load_with_images=True)
+PATH = Path('/usr/downlaods/spectra_data')
+dataset= SpectralDataset(device=Device.BIO_SCIENCE, data_path=PATH)
+dataloader = SpectralDataLoader(dataset, batch_size=4)
 
-for batch in lf:
+for batch in dataloader:
     x, y, images = next(iter(lf))
     print(f'x_shape: {x.shape}',f'y_shape: {y.shape}', f'image_shape: {images.shape}')
 
 
 
 # Load data for the SCAN_CODER device
-lf = load_spectra(device=Device.SCAN_CODER, shuffle=False, no_files_per_load=4, load_with_images=True)
+dataset= SpectralDataset(device=Device.SCAN_CORDER, data_path=PATH)
 
 # Load data for the LOW_COST device
-lf = load_spectra(device=Device.LOW_COST, shuffle=False, no_files_per_load=4, load_with_images=True)
+dataset= SpectralDataset(device=Device.LOW_COST, data_path=PATH)
 
-# Loading only spectra data without images
-lf = load_spectra(device=Device.LOW_COST, shuffle=False, no_files_per_load=4, load_with_images=False)
-
-    for batch in lf:
-        x, y = next(iter(lf))
-        print(f'x_shape: {x.shape}',f'y_shape: {y.shape}')
-
-# To load all the data in-memory (Note is too huge, partial loading can be achieved by reducing the no_files_per_load)
-lf = load_spectra(device=Device.SCAN_CODER, shuffle=False, no_files_per_load=-1, load_with_images=True)
-x, y, images = next(iter(lf))
 
 ```
 
@@ -121,15 +114,14 @@ Feature matrix (x) currently contains only the calibrated wavelength reading of 
 Dynamic data loading
 
 ```python
-from buaiir_spectra.data.dataset import SpectralDataset
-from buaiir_spectra.utils.device import Device
+from buaiir_spectra.data.dataset import SpectralDataset, Device
 
 # Path to where data is store
 DATA_PATH = '/home/wilfred/Datasets/spectra_data'
 
 for test_device in Device.get_devices():
     dataset = SpectralDataset(DATA_PATH, device=test_device) # dataset
-    x, y = dataset[0] # load sample data
+    x, img, y = dataset[0] # load sample data
     print(f'Prinitng shapes for device: {test_device.name}')
     print(x.shape, y.shape)
 
@@ -138,11 +130,11 @@ for test_device in Device.get_devices():
 Properties of dataset
 
 ```python
-from buaiir_spectra.data.dataset import SpectralDataset
-from buaiir_spectra.utils.device import Device
+from buaiir_spectra.data.dataset import SpectralDataset, Device
+
 
 # create Dataset object for LOW COST only
-dataset = SpectralDataset('/home/usr/Datasets/spectra_data', Device.SCAN_CODER)
+dataset = SpectralDataset('/home/usr/Datasets/spectra_data', Device.SCAN_CORDER)
 
 # Get wavelength range for the device
 wavelength = dataset.wavelength
@@ -161,9 +153,8 @@ print(f'Supported crop types: {plant_types}')
 Data batching
 
 ```python
-from buaiir_spectra.data.dataset import SpectralDataset
-from buaiir_spectra.utils.device import Device
-from buaiir_spectra.data.dataloader import SpectralDataLoader
+from buaiir_spectra.data.dataset import SpectralDataset, Device, SpectralDataLoader
+
 
 # Path to where you dataset is store: adjust accordingly
 DATA_PATH = '/home/usr/Datasets/spectra_data'
@@ -176,7 +167,7 @@ dataloader = SpectralDataLoader(dataset, batch_size=4)
 # iterate over the batchs
 for batch in dataloader:
     # extract the x_batch and y_batch
-    x_batch, y_batch = batch
+    x_batch,img_batch, y_batch = batch
 
     # print the shape of the batches
     print(x_batch.shape, y_batch.shape)
@@ -186,13 +177,12 @@ for batch in dataloader:
 Parameters for data wrangling provided by Dataloader
 
 ```python
-from buaiir_spectra.data.dataset import SpectralDataset
-from buaiir_spectra.data.dataloader import SpectralDataLoader
-from buaiir_spectra.utils.device import Device
+from buaiir_spectra.data.dataset import SpectralDataset, SpectralDataLoader, Device
+import pathlib
 
 
 # Path to where you dataset is store: adjust accordingly
-DATA_PATH = '/home/usr/Datasets/spectra_data'
+DATA_PATH = pathlib.Path('/home/usr/Datasets/spectra_data')
 
 # Loading data for BIO SCINCE
 dataset = SpectralDataset(data_path=DATA_PATH, device=Device.BIO_SCIENCE)
