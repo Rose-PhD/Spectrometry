@@ -30,17 +30,17 @@ Each crop type was subjected to controlled inoculation with viral and bacterial 
 
 Each crop contains a healthy control class plus disease-specific classes:
 
-| Crop    | Class Code | Description              |
-| ------- | ---------- | ------------------------ |
-| Beans   | HLT        | Healthy / Control        |
-| Beans   | BLB        | Bean Bacterial Blight    |
-| Beans   | BRD        | Bean Rust Disease        |
-| Maize   | HLT        | Healthy / Control        |
-| Maize   | MSV        | Maize Streak Virus       |
-| Maize   | MLN        | Maize Lethal Necrosis    |
-| Cassava | HLT        | Healthy / Control        |
-| Cassava | CMD        | Cassava Mosaic Disease   |
-| Cassava | CBB        | Cassava Bacterial Blight |
+| Crop    | Class Code | Description                  |
+| ------- | ---------- | ---------------------------- |
+| Beans   | HLT        | Healthy / Control            |
+| Beans   | BLB        | Bean Bacterial Blight        |
+| Beans   | BRD        | Bean Rust Disease            |
+| Maize   | HLT        | Healthy / Control            |
+| Maize   | MSV        | Maize Streak Virus           |
+| Maize   | MLN        | Maize Lethal Necrosis        |
+| Cassava | HLT        | Healthy / Control            |
+| Cassava | CBSD       | Cassava Brown Streak Disease |
+| Cassava | CBB        | Cassava Bacterial Blight     |
 
 ### Data Collection Period
 
